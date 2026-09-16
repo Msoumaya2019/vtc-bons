@@ -243,6 +243,30 @@ describe('verifierConformiteFacture', () => {
     expect(champsBloques(verifierConformiteFacture(sansAcheteur, reglagesTest()))).toContain('client');
   });
 
+  it('avertit sans bloquer quand l’adresse de l’acheteur manque', () => {
+    // Les sources ne concordent pas, et trancher à la place du chauffeur serait malhonnête :
+    // la fiche pratique de l'administration (service-public, citant l'article 242 nonies A
+    // de l'annexe II au CGI) demande l'adresse pour un client PARTICULIER et se contente du
+    // nom pour une ENTREPRISE, tandis que le BOFiP parle des « adresses respectives » sans
+    // distinguer. Un blocage reposerait donc sur une règle dont l'étendue n'est pas établie,
+    // et empêcherait d'émettre une facture qui peut parfaitement être conforme.
+    const facture = factureTest();
+    const sansAdresse = {
+      ...facture,
+      clientSnapshot: { ...facture.clientSnapshot, adresse: '', codePostal: '', ville: '' },
+    };
+
+    const problemes = verifierConformiteFacture(sansAdresse, reglagesTest());
+
+    expect(blocages(problemes)).toEqual([]);
+    expect(avertissements(problemes).map((p) => p.champ)).toContain('adresseClient');
+  });
+
+  it('n’avertit pas quand l’adresse de l’acheteur est renseignée', () => {
+    const problemes = verifierConformiteFacture(factureTest(), reglagesTest());
+    expect(avertissements(problemes).map((p) => p.champ)).not.toContain('adresseClient');
+  });
+
   it('bloque une facture sans ligne de prestation', () => {
     const problemes = verifierConformiteFacture(factureTest({ lignes: [] }), reglagesTest());
     expect(champsBloques(problemes)).toContain('lignes');

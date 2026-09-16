@@ -14,6 +14,8 @@ import { ajouterJours, dateLocaleISO } from '../../lib/format';
 import { calculerTotaux, mentionTVA } from '../../lib/tva';
 import { snapshotClient, snapshotEmetteur } from '../../lib/snapshots';
 import { genererEtStockerPdfFacture } from '../../lib/pdf/generate';
+import { blocages, verifierConformiteFacture } from '../bons/conformite';
+import { ErreurConformite } from '../bons/service';
 import type {
   Bon,
   Client,
@@ -51,6 +53,29 @@ function calculerMontants(
 }
 
 /**
+ * Refuse d'émettre une facture non conforme, avant toute écriture et toute numérotation.
+ *
+ * Ce contrôle existait déjà, mais seul l'écran de détail l'appelait : la facture était
+ * donc créée, numérotée et imprimée quoi qu'il arrive, et l'écran se contentait d'afficher
+ * « À corriger » sur un document DÉJÀ émis. Le blocage prévu pour l'absence de numéro de
+ * TVA intracommunautaire n'a jamais pu se déclencher.
+ *
+ * Il est centralisé ici pour que les deux voies de création — depuis un bon et en facture
+ * libre — ne puissent pas diverger.
+ *
+ * Il n'est PAS appliqué à `creerAvoir` : un avoir est le REMÈDE à une facture fautive, et
+ * refuser le remède emprisonnerait le chauffeur avec une facture qu'il ne pourrait plus
+ * annuler. Les factures déjà présentes sur son appareil, créées avant ce contrôle, doivent
+ * pouvoir être corrigées.
+ */
+function verifierFactureEmettable(facture: Facture, settings: Settings): void {
+  const bloquants = blocages(verifierConformiteFacture(facture, settings));
+  if (bloquants.length > 0) {
+    throw new ErreurConformite(bloquants.map((probleme) => probleme.message));
+  }
+}
+
+/**
  * Crée la facture associée à un bon de commande.
  * Refuse la double facturation : c'est la protection la plus importante de ce module.
  */
@@ -77,13 +102,15 @@ export async function creerFactureDepuisBon(
   const datePrestation = options.datePrestation ?? bon.datePriseEnCharge ?? dateEmission;
   const dateEcheance = ajouterJours(dateEmission, settings.delaiPaiementJours || 0);
   const annee = Number(dateEmission.slice(0, 4));
-  const numero = await prochainNumero(optionsDepuisSettings(settings, 'facture', annee));
 
   const totaux = calculerMontants(bon.lignes, settings, bon.remiseGlobale);
 
   const facture: Facture = {
     id: identifiant(),
-    numero,
+    // Numéro attribué APRÈS le contrôle : `prochainNumero` consomme un numéro d'une
+    // séquence chronologique continue, et en brûler un pour une facture jamais émise y
+    // laisserait un trou.
+    numero: '',
     type: 'facture',
     bonId: bon.id,
     factureOrigineId: null,
@@ -116,13 +143,16 @@ export async function creerFactureDepuisBon(
     supprimeLe: null,
   };
 
+  verifierFactureEmettable(facture, settings);
+  facture.numero = await prochainNumero(optionsDepuisSettings(settings, 'facture', annee));
+
   await db.factures.put(facture);
   await db.bons.update(bon.id, { statut: 'facture', factureId: facture.id });
   await journaliser(
     'facture',
     facture.id,
     'creation',
-    `Facture ${numero} créée depuis le bon ${bon.numero ?? bon.id}`,
+    `Facture ${facture.numero} créée depuis le bon ${bon.numero ?? bon.id}`,
   );
 
   try {
@@ -150,14 +180,14 @@ export async function creerFactureLibre(
   const datePrestation = options.datePrestation ?? dateEmission;
   const dateEcheance = ajouterJours(dateEmission, settings.delaiPaiementJours || 0);
   const annee = Number(dateEmission.slice(0, 4));
-  const numero = await prochainNumero(optionsDepuisSettings(settings, 'facture', annee));
 
   const remise = options.remiseGlobale ?? null;
   const totaux = calculerMontants(lignes, settings, remise);
 
   const facture: Facture = {
     id: identifiant(),
-    numero,
+    // Voir `verifierFactureEmettable` : le numéro n'est attribué qu'après le contrôle.
+    numero: '',
     type: 'facture',
     bonId: null,
     factureOrigineId: null,
@@ -190,8 +220,11 @@ export async function creerFactureLibre(
     supprimeLe: null,
   };
 
+  verifierFactureEmettable(facture, settings);
+  facture.numero = await prochainNumero(optionsDepuisSettings(settings, 'facture', annee));
+
   await db.factures.put(facture);
-  await journaliser('facture', facture.id, 'creation', `Facture ${numero} créée sans bon`);
+  await journaliser('facture', facture.id, 'creation', `Facture ${facture.numero} créée sans bon`);
   try {
     await genererEtStockerPdfFacture(facture.id, settings);
   } catch {

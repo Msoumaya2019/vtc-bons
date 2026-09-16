@@ -205,7 +205,7 @@ Le guide pas à pas, sans ligne de commande, se trouve dans **[SETUP.md](SETUP.m
 
 ## Ce que les tests vérifient
 
-366 tests, répartis en seize fichiers. Ils ne mesurent pas la quantité de code, mais les
+372 tests, répartis en seize fichiers. Ils ne mesurent pas la quantité de code, mais les
 endroits où une erreur coûte cher.
 
 | Fichier | Ce qu'il protège |
@@ -213,10 +213,10 @@ endroits où une erreur coûte cher.
 | `tva.test.ts` | Le calcul HT / TVA / TTC : taux à 10 %, services annexes jamais à 20 %, TVA par taux et non par ligne, franchise, débours, remises réparties au centime près |
 | `money.test.ts` | Conversions et arrondis — aucun calcul monétaire en flottant |
 | `numbering.test.ts` | Séquence continue, sans trou ni doublon, y compris sous vingt appels simultanés |
-| `conformite.test.ts` | Les 7 mentions de l'arrêté, une par une, le refus d'émettre un bon daté après la course, et l'avertissement sur un bon sans montant — le prix n'étant pas une des 7 mentions, il ne peut pas bloquer, mais un bon à 0 € reste un document faux |
+| `conformite.test.ts` | Les 7 mentions de l'arrêté, une par une, le refus d'émettre un bon daté après la course, l'avertissement sur un bon sans montant, et celui sur l'adresse manquante de l'acheteur — le prix et l'adresse n'étant pas des mentions dont l'exigence est établie dans tous les cas, ils ne peuvent pas bloquer, mais les taire laisserait l'application affirmer une conformité qu'elle n'a pas vérifiée |
 | `documentData.test.ts` | Le contenu réellement imprimé sur les PDF, mentions comprises |
 | `pdf.test.ts` | Le rendu effectif des PDF : quinze documents réellement produits |
-| `factures.test.ts` | Refus de la double facturation, avoirs, statuts, indicateurs |
+| `factures.test.ts` | Refus de la double facturation, refus d'émettre une facture non conforme **avant** toute écriture et toute numérotation, avoirs toujours possibles même sur une facture fautive, statuts, indicateurs |
 | `backup.test.ts` | Aller-retour de sauvegarde fidèle, sauvegarde corrompue refusée, et survie du profil de bon instantané — le perdre ferait retomber le chauffeur sur la saisie complète sans le lui dire |
 | `geo.test.ts` | L'aide à l'adresse face au réseau : coupé, en panne, réponse illisible — la fonction rend toujours la main. Vérifie aussi l'ordre des coordonnées envoyées à OSRM : inversées, elles ne produisent pas d'erreur mais un point au milieu de l'océan, et une distance absurde |
 | `champ-adresse.test.tsx` | Le champ d'adresse : choix d'une proposition, parcours au clavier, et Échap qui referme la liste **sans** fermer la fenêtre qui l'abrite |

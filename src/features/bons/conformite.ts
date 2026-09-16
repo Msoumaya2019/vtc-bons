@@ -236,6 +236,29 @@ export function verifierConformiteFacture(
       champ: 'client',
       message: 'L’identité de l’acheteur est une mention obligatoire de la facture.',
     });
+  } else if (vide(facture.clientSnapshot.adresse)) {
+    // L'adresse de l'acheteur, et pourquoi elle n'est qu'un avertissement.
+    //
+    // Les sources ne concordent pas, et il serait malhonnête de trancher à la place du
+    // chauffeur. La fiche pratique de l'administration (service-public, à jour du
+    // 11 août 2026, citant l'article 242 nonies A de l'annexe II au CGI) demande, pour
+    // un client PARTICULIER, « nom complet, adresse du client » — mais ne réclame que le
+    // nom pour un client ENTREPRISE. Le BOFiP, lui, parle des « adresses respectives de
+    // l'assujetti et de son client », sans distinguer.
+    //
+    // Un blocage reposerait donc sur une règle dont l'étendue n'est pas établie, et il
+    // empêcherait d'émettre une facture qui peut parfaitement être conforme. On signale
+    // sans bloquer — comme pour la mention d'assurance, autre mention dont l'exigence
+    // dépend du cas.
+    //
+    // Ce qui compte, c'est que la facture cesse d'être annoncée « toutes mentions
+    // renseignées » : c'est cette affirmation-là qui était fausse.
+    problemes.push({
+      niveau: 'avertissement',
+      champ: 'adresseClient',
+      message:
+        'L’adresse de l’acheteur n’est pas renseignée. Elle est attendue sur une facture, en particulier pour un client particulier : complétez la fiche client.',
+    });
   }
   if (!facture.lignes || facture.lignes.length === 0) {
     problemes.push({

@@ -34,6 +34,9 @@ import {
   restaurerFacture,
   statutEffectif,
 } from '../src/features/factures/service';
+import { ErreurConformite } from '../src/features/bons/service';
+import { avertissements, verifierConformiteFacture } from '../src/features/bons/conformite';
+import { snapshotClient } from '../src/lib/snapshots';
 import { bonTest, clientTest, factureTest, ligneTest, reglagesTest } from './aides';
 import type { Facture } from '../src/types';
 
@@ -138,6 +141,35 @@ describe('creerFactureDepuisBon', () => {
     expect(await db.compteurs.get('FA-2026')).toBeUndefined();
   });
 
+  it('refuse d’émettre une facture non conforme, avant toute écriture', async () => {
+    // Le contrôle de conformité existait déjà, mais seul l'écran de détail l'appelait :
+    // la facture était créée, numérotée et imprimée quoi qu'il arrive, et l'écran se
+    // contentait d'afficher « À corriger » sur un document DÉJÀ émis. Le blocage prévu
+    // pour le numéro de TVA intracommunautaire n'avait donc jamais pu se déclencher.
+    await db.bons.put(bonTest());
+    const sansTva = reglagesTest({ regimeTVA: 'assujetti', numeroTVAIntracom: '' });
+
+    await expect(creerFactureDepuisBon('bon-1', sansTva)).rejects.toBeInstanceOf(ErreurConformite);
+
+    expect(await db.factures.count()).toBe(0);
+    expect(await db.compteurs.get('FA-2026')).toBeUndefined();
+  });
+
+  it('avertit, sans bloquer, quand l’adresse de l’acheteur manque', async () => {
+    // L'adresse de l'acheteur n'est qu'un avertissement : les sources divergent sur son
+    // exigence pour un client professionnel, et bloquer empêcherait d'émettre une facture
+    // qui peut parfaitement être conforme. Ce qui compte, c'est que l'écran cesse
+    // d'annoncer « toutes les mentions obligatoires sont renseignées ».
+    const client = clientTest({ adresse: '', codePostal: '', ville: '' });
+    await db.bons.put(bonTest({ clientSnapshot: snapshotClient(client) }));
+
+    const facture = await creerFactureDepuisBon('bon-1', REGLAGES, { dateEmission: '2026-03-16' });
+
+    expect(facture.statut).toBe('emise');
+    const avis = avertissements(verifierConformiteFacture(facture, REGLAGES));
+    expect(avis.map((probleme) => probleme.champ)).toContain('adresseClient');
+  });
+
   it('reporte la remise globale du bon', async () => {
     await db.bons.put(bonTest({ remiseGlobale: { type: 'pourcentage', valeur: 10 } }));
     const facture = await creerFactureDepuisBon('bon-1', REGLAGES, { dateEmission: '2026-03-16' });
@@ -156,6 +188,17 @@ describe('creerFactureLibre', () => {
     expect(facture.numero).toBe('FA-2026-0001');
     expect(facture.montantTTC).toBe(11000);
   });
+
+  it('refuse d’émettre une facture non conforme, sans rien numéroter', async () => {
+    const sansTva = reglagesTest({ regimeTVA: 'assujetti', numeroTVAIntracom: '' });
+
+    await expect(
+      creerFactureLibre(clientTest(), [ligneTest()], sansTva),
+    ).rejects.toBeInstanceOf(ErreurConformite);
+
+    expect(await db.factures.count()).toBe(0);
+    expect(await db.compteurs.get('FA-2026')).toBeUndefined();
+  });
 });
 
 describe('creerAvoir', () => {
@@ -167,6 +210,21 @@ describe('creerAvoir', () => {
 
   it('émet un avoir de type avoir, avec sa propre numérotation', async () => {
     const { avoir } = await avoirSurFactureExistante();
+    expect(avoir.type).toBe('avoir');
+    expect(avoir.numero).toBe('AV-2026-0001');
+  });
+
+  it('reste possible même quand une NOUVELLE facture serait refusée', async () => {
+    // Asymétrie voulue, et à ne pas défaire : un avoir est le REMÈDE à une facture
+    // fautive. Le soumettre au même contrôle qu'une facture neuve emprisonnerait le
+    // chauffeur avec une facture qu'il ne pourrait plus annuler — en particulier les
+    // factures créées avant que ce contrôle n'existe sur son appareil.
+    const origine = factureTest();
+    await db.factures.put(origine);
+    const sansTva = reglagesTest({ regimeTVA: 'assujetti', numeroTVAIntracom: '' });
+
+    const avoir = await creerAvoir(origine.id, sansTva);
+
     expect(avoir.type).toBe('avoir');
     expect(avoir.numero).toBe('AV-2026-0001');
   });
