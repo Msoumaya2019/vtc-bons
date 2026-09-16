@@ -22,7 +22,7 @@ import {
   VERSION_SAUVEGARDE,
   validerSauvegarde,
 } from '../src/lib/backup';
-import { bonTest, clientTest, factureTest, reglagesTest } from './aides';
+import { bonTest, clientInstantaneTest, clientTest, factureTest, reglagesTest } from './aides';
 import type { Sauvegarde } from '../src/types';
 
 /** Remplit la base avec un jeu de données représentatif. */
@@ -231,6 +231,30 @@ describe('aller-retour par fichier JSON', () => {
     const fichier = new File(['{"autre":true}'], 'autre.json', { type: 'application/json' });
     const { validation } = await lireFichierSauvegarde(fichier);
     expect(validation.valide).toBe(false);
+  });
+
+  it('conserve le profil de bon instantané', async () => {
+    // Le profil est ce qui permet de générer un bon d'un seul geste. Le perdre à la
+    // restauration ferait retomber le chauffeur sur la saisie complète — sans qu'aucun
+    // message ne l'explique, et il ne s'en apercevrait qu'au moment de partir.
+    await db.clients.put(clientInstantaneTest());
+
+    const blob = await exporterJson();
+    const fichier = new File([blob], 'sauvegarde.json', { type: 'application/json' });
+    const { validation, sauvegarde } = await lireFichierSauvegarde(fichier);
+    expect(validation.valide).toBe(true);
+
+    await effacerToutesLesDonnees();
+    await restaurerSauvegarde(sauvegarde as Sauvegarde);
+
+    const profil = (await db.clients.get('client-1'))?.instantane;
+    expect(profil?.actif).toBe(true);
+    expect(profil?.utiliserMaPosition).toBe(true);
+    expect(profil?.lieuPriseEnCharge).toBe('5 avenue Victor Hugo, 75016 Paris');
+    expect(profil?.destination).toBe('Aéroport Charles-de-Gaulle, terminal 2E');
+    expect(profil?.prixTTCcentimes).toBe(9500);
+    expect(profil?.distanceKm).toBe(32);
+    expect(profil?.typePrestation).toBe('transfert_aeroport');
   });
 });
 
