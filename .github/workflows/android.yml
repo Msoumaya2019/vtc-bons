@@ -39,7 +39,9 @@ jobs:
           java-version: '21'
 
       - name: Installer le SDK Android
-        uses: android-actions/setup-android@v3
+        # v4 est requis : la v3 tente d'installer le paquet « tools », retiré du
+        # dépôt Android. Elle échoue donc systématiquement, quel que soit le projet.
+        uses: android-actions/setup-android@v4
 
       - name: Installer les dépendances
         run: npm ci

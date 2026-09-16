@@ -47,8 +47,20 @@ jobs:
       - name: Compiler sans signature
         working-directory: ios/App
         run: |
+          # Capacitor 8 ne produit plus systématiquement un espace de travail
+          # CocoaPods : selon la configuration, le projet est un simple
+          # `App.xcodeproj` (Swift Package Manager). On prend donc ce qui existe
+          # plutôt que de supposer, sinon xcodebuild s'arrête sur un
+          # « App.xcworkspace does not exist ».
+          if [ -d App.xcworkspace ]; then
+            CIBLE=(-workspace App.xcworkspace)
+          else
+            CIBLE=(-project App.xcodeproj)
+          fi
+          echo "Cible de compilation : ${CIBLE[*]}"
+
           xcodebuild \
-            -workspace App.xcworkspace \
+            "${CIBLE[@]}" \
             -scheme App \
             -configuration Release \
             -sdk iphoneos \
