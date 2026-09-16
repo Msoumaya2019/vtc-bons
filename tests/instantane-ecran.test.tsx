@@ -16,7 +16,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 vi.mock('../src/lib/pdf/generate', () => ({
@@ -236,6 +236,32 @@ describe('PageInstantane', () => {
 
     await waitFor(async () => expect(await db.bons.count()).toBe(1), { timeout: DELAI });
     expect(geoSimule.positionActuelle).not.toHaveBeenCalled();
+  });
+  it('ne génère qu’un seul bon si le bouton est touché deux fois d’affilée', async () => {
+    // Deux appuis traités dans la même passe : sans verrou, l'application émettrait
+    // deux bons numérotés pour une seule course, et laisserait un trou dans la
+    // séquence — ce que la réglementation interdit.
+    await saveSettings(reglagesTest());
+    await db.clients.put(clientInstantaneTest());
+
+    await ouvrirEcran();
+    const bouton = await screen.findByRole('button', {
+      name: 'Générer le bon instantané de Martin Leroy',
+    });
+
+    await act(async () => {
+      fireEvent.click(bouton);
+      fireEvent.click(bouton);
+    });
+
+    // Le premier geste aboutit et ouvre la fiche du bon. On attend cet aboutissement
+    // plutôt que de guetter un compteur : un compteur qui ne monte jamais au bon
+    // chiffre ne produirait qu'un dépassement de délai, qui ne dit rien.
+    expect(await screen.findByText('Fiche du bon', {}, { timeout: DELAI })).toBeInTheDocument();
+
+    // La preuve la plus directe : le second geste n'a même pas commencé.
+    expect(geoSimule.positionActuelle).toHaveBeenCalledTimes(1);
+    expect(await db.bons.count()).toBe(1);
   });
 });
 

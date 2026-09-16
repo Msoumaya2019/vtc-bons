@@ -16,7 +16,7 @@
  *    que le chauffeur ne l'a pas lue. Un message fugace serait un message perdu.
  */
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useClients } from '../../context/ClientsContext';
 import { useReglages } from '../../context/ReglagesContext';
@@ -48,11 +48,24 @@ export function PageInstantane() {
   const [erreurs, setErreurs] = useState<string[]>([]);
   const [reserve, setReserve] = useState<Reserve | null>(null);
 
+  /**
+   * Verrou du geste en cours.
+   *
+   * L'état ci-dessus désactive le bouton, mais il ne suffit pas : deux appuis traités
+   * dans la même passe verraient tous deux l'ancien état, et l'application émettrait
+   * DEUX bons numérotés pour une seule course. Une référence est lue immédiatement, et
+   * ferme cette fenêtre. Le numéro consommé en trop laisserait un trou dans la
+   * séquence, ce que la réglementation interdit.
+   */
+  const gesteEnCours = useRef(false);
+
   if (!settings) return null;
 
   const profils = clients.filter((client) => client.instantane.actif);
 
   const generer = async (client: Client) => {
+    if (gesteEnCours.current) return;
+    gesteEnCours.current = true;
     setEnCours(client.id);
     setErreurs([]);
     setReserve(null);
@@ -82,6 +95,7 @@ export function PageInstantane() {
         toast.erreur('La génération du bon a échoué.');
       }
     } finally {
+      gesteEnCours.current = false;
       setEnCours(null);
     }
   };
