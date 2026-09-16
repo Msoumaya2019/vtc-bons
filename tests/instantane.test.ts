@@ -173,6 +173,21 @@ describe('problemesInstantane', () => {
     expect(messages.join(' ')).toContain('lieu de prise en charge');
   });
 
+  it('bloque un profil dont le prix n’a pas été renseigné', () => {
+    // Le prix n'est PAS une des sept mentions de l'arrêté : un bon à 0 € est
+    // légalement valable, et le contrôle de conformité ne le refuse donc pas. C'est
+    // précisément pour cela que ce manque doit être signalé ailleurs. Sans cette
+    // règle, l'écran annonce « Prêt », le chauffeur appuie devant son client, et
+    // repart avec un bon numéroté à 0 €.
+    const client = clientInstantaneTest({
+      instantane: profilInstantane({ prixTTCcentimes: 0 }),
+    });
+
+    const messages = blocages(problemesInstantane(client, REGLAGES)).map((p) => p.message);
+
+    expect(messages.join(' ')).toContain('0 €');
+  });
+
   it('bloque un profil désactivé et vide', () => {
     const problemes = blocages(problemesInstantane(clientTest(), REGLAGES));
 
@@ -259,6 +274,20 @@ describe('genererBonInstantane', () => {
     const client = clientInstantaneTest({ telephone: '' });
 
     await expect(genererBonInstantane(client, REGLAGES)).rejects.toBeInstanceOf(ErreurConformite);
+    expect(await db.bons.count()).toBe(0);
+  });
+
+  it('refuse d’émettre un bon à 0 €, sans rien écrire ni numéroter', async () => {
+    // Le garde-fou du bouton grisé ne suffit pas : c'est ici que la règle doit tenir.
+    // Un numéro consommé pour un document faux laisserait de plus une trace dans une
+    // séquence que la réglementation veut continue.
+    const client = clientInstantaneTest({
+      instantane: profilInstantane({ prixTTCcentimes: 0 }),
+    });
+
+    await expect(genererBonInstantane(client, REGLAGES)).rejects.toMatchObject({
+      problemes: expect.arrayContaining([expect.stringContaining('0 €')]),
+    });
     expect(await db.bons.count()).toBe(0);
   });
 

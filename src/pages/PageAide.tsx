@@ -66,7 +66,8 @@ export function PageAide() {
           L’onglet <strong>Instantané</strong> génère un bon en un seul geste : vous appuyez sur le
           client, votre position devient le lieu de prise en charge, et le bon est émis. La
           destination, le prix et le reste viennent du profil que vous avez renseigné une fois pour
-          toutes sur sa fiche.
+          toutes sur sa fiche. Tant qu’il manque le prix, l’onglet refuse de générer : le bon serait
+          émis à 0 €.
         </p>
         <p className="text-sm text-slate-600 dark:text-slate-300">
           Un tel bon est daté de l’instant où vous le générez : la réservation et la prise en charge

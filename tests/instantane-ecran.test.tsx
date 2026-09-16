@@ -138,6 +138,24 @@ describe('PageInstantane', () => {
     ).toBeDisabled();
   });
 
+  it('annonce un profil sans prix, et bloque le bouton', async () => {
+    // Le prix n'est pas une des sept mentions de l'arrêté : rien, dans le contrôle
+    // d'émission, ne s'oppose à un bon à 0 €. Sans une règle propre au profil, la
+    // carte afficherait donc « Prêt » et l'appui émettrait un document faux.
+    await saveSettings(reglagesTest());
+    await db.clients.put(
+      clientInstantaneTest({ instantane: profilInstantane({ prixTTCcentimes: 0 }) }),
+    );
+
+    await ouvrirEcran();
+
+    expect(await screen.findByText('À compléter')).toBeInTheDocument();
+    expect(screen.getByText(/Aucun prix habituel/)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Générer le bon instantané de Martin Leroy' }),
+    ).toBeDisabled();
+  });
+
   it('génère le bon d’un seul clic et ouvre sa fiche', async () => {
     await saveSettings(reglagesTest());
     await db.clients.put(clientInstantaneTest());
@@ -315,7 +333,9 @@ describe('profil instantané, depuis la fiche client', () => {
     fireEvent.change(screen.getByLabelText('Destination habituelle'), {
       target: { value: 'Aéroport Charles-de-Gaulle, terminal 2E' },
     });
-    fireEvent.change(screen.getByLabelText('Prix habituel TTC (€)'), {
+    // Requête ancrée : le champ étant obligatoire, son libellé accessible porte un
+    // astérisque, et une correspondance exacte ne le trouverait plus.
+    fireEvent.change(screen.getByLabelText(/^Prix habituel TTC/), {
       target: { value: '95' },
     });
 

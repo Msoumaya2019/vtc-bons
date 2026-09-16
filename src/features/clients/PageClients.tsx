@@ -434,7 +434,8 @@ export function PageClients() {
                 <div className="grid grid-cols-2 gap-3">
                   <Champ
                     label="Prix habituel TTC (€)"
-                    aide="Le HT et la TVA sont recalculés selon votre régime."
+                    aide="Le HT et la TVA sont recalculés selon votre régime. Sans lui, l’onglet Instantané refusera de générer : le bon serait émis à 0 €."
+                    obligatoire
                   >
                     {(id) => (
                       <Saisie

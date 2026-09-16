@@ -80,18 +80,61 @@ export function construireBonInstantane(
 }
 
 /**
- * Ce qui empêcherait ce profil de produire un bon conforme.
+ * Ce qu'un profil doit contenir pour produire un bon exploitable.
+ *
+ * À ne pas confondre avec les mentions de l'arrêté, et la distinction n'est pas
+ * cosmétique : un bon à 0 € est un justificatif **légalement valable** — le prix ne
+ * figure pas parmi les sept mentions. Le contrôle de conformité ne peut donc pas le
+ * refuser, et il ne le fait pas. Il n'en reste pas moins un document FAUX, déjà émis
+ * et déjà numéroté, que le chauffeur ne découvrirait qu'en le tendant à son client,
+ * devant lui.
+ *
+ * C'est le seul manque de cette famille : la destination et le nombre de passagers
+ * restent des avertissements, parce qu'un bon sans eux demeure exploitable.
+ */
+function manquesDuProfil(client: Client): Probleme[] {
+  const problemes: Probleme[] = [];
+
+  if (client.instantane.prixTTCcentimes <= 0) {
+    problemes.push({
+      niveau: 'blocage',
+      champ: 'instantane.prixTTCcentimes',
+      message:
+        'Aucun prix habituel : le bon serait émis à 0 €. Renseignez-le sur la fiche du client.',
+    });
+  }
+
+  return problemes;
+}
+
+/**
+ * Les problèmes d'un bon donné, manques du profil compris.
+ *
+ * Le bon est fourni plutôt que reconstruit, et c'est nécessaire : à l'écran il porte
+ * le lieu de prise en charge de SECOURS, tandis qu'à l'émission il porte le lieu
+ * réellement retenu, position comprise. Les deux ne coïncident pas toujours, et le
+ * contrôle doit porter sur ce qui sera vraiment écrit.
+ */
+function problemesDe(client: Client, bon: Bon, settings: Settings): Probleme[] {
+  return [...verifierConformiteBon(bon, settings, client), ...manquesDuProfil(client)];
+}
+
+/**
+ * Ce qui empêcherait ce profil de produire un bon exploitable.
  *
  * On interroge le contrôle d'émission lui-même, avec le lieu de prise en charge de
  * SECOURS : si le profil ne tient pas sans position, il ne tient pas tout court, et
  * l'écran doit le dire avant que le chauffeur ne compte dessus. Une seconde liste de
  * règles, écrite pour cet écran, finirait par diverger de la première.
+ *
+ * L'écran et l'émission passent tous deux par ici : c'est ce qui garantit que le
+ * bouton grisé, le bandeau et le refus disent exactement la même chose.
  */
 export function problemesInstantane(client: Client, settings: Settings): Probleme[] {
-  return verifierConformiteBon(
+  return problemesDe(
+    client,
     construireBonInstantane(client, settings, client.instantane.lieuPriseEnCharge),
     settings,
-    client,
   );
 }
 
@@ -148,7 +191,7 @@ export async function genererBonInstantane(
   const bon = construireBonInstantane(client, settings, lieuPriseEnCharge);
 
   // Contrôle AVANT écriture : un échec ne doit rien laisser derrière lui.
-  const bloquants = blocages(verifierConformiteBon(bon, settings, client));
+  const bloquants = blocages(problemesDe(client, bon, settings));
   if (bloquants.length > 0) {
     throw new ErreurConformite(bloquants.map((probleme) => probleme.message));
   }
