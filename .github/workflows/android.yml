@@ -40,8 +40,13 @@ jobs:
 
       - name: Installer le SDK Android
         # v4 est requis : la v3 tente d'installer le paquet « tools », retiré du
-        # dépôt Android. Elle échoue donc systématiquement, quel que soit le projet.
+        # dépôt Android, et échoue systématiquement.
         uses: android-actions/setup-android@v4
+        with:
+          # Le paquet « tools » figure dans la liste par défaut de l'action, alors
+          # qu'il n'existe plus dans le dépôt Android. Sans cette précision,
+          # l'installation s'arrête avant même la première compilation.
+          packages: 'platform-tools'
 
       - name: Installer les dépendances
         run: npm ci
