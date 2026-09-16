@@ -95,6 +95,17 @@ beforeEach(async () => {
     position: { longitude: 2.0969, latitude: 49.0512 },
   });
   geoSimule.adresseDepuisPosition.mockResolvedValue(ADRESSE_POSITION);
+  // Ces deux simulations doivent rendre une valeur, et surtout pas `undefined` : le champ
+  // d'adresse appelle `.then()` sur le résultat de `chercherAdresses`, depuis une minuterie
+  // de frappe. Un `vi.fn()` nu rend `undefined`, et la minuterie lève alors une exception
+  // non rattrapée — souvent APRÈS la fin du test, si bien qu'elle est attribuée à un autre
+  // fichier et passe pour du bruit sans conséquence.
+  //
+  // C'est la simulation qui ne ressemblait pas à l'application : en production ces deux
+  // fonctions sont `async` et rendent toujours une promesse. `null` pour la distance est la
+  // valeur prévue par l'application, qui affiche alors « Distance indisponible ».
+  geoSimule.chercherAdresses.mockResolvedValue([]);
+  geoSimule.calculerDistance.mockResolvedValue(null);
 });
 
 describe('PageInstantane', () => {

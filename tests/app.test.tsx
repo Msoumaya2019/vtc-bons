@@ -93,6 +93,15 @@ beforeEach(async () => {
   await effacerToutesLesDonnees();
   window.location.hash = '#/';
 
+  // Valeurs par défaut des simulations réseau. Sans elles, un `vi.fn()` nu rend
+  // `undefined`, et l'application appelle `.then()` sur ce résultat depuis une minuterie de
+  // frappe : l'exception levée là est non rattrapée, souvent après la fin du test, et
+  // attribuée à un autre fichier — du bruit qui finit par masquer de vraies erreurs.
+  //
+  // Le bloc « aide à la saisie d'adresse » ci-dessous remplace ces valeurs par les siennes.
+  geoSimule.chercherAdresses.mockResolvedValue([]);
+  geoSimule.calculerDistance.mockResolvedValue(null);
+
   // React signale dans la console toute erreur de rendu ou de prop. Un démarrage propre
   // ne doit rien y écrire : ce contrôle attrape les défauts qu'aucune assertion ne
   // penserait à couvrir.
@@ -243,6 +252,21 @@ describe('routes', () => {
     expect(repere).toHaveTextContent(/^Version du \d{2}\/\d{2}\/\d{4} \([0-9a-f]{7,}\)$/);
   });
 
+  it('affiche l’adresse directe de l’onglet Instantané, seul recours sur iPhone', async () => {
+    // Safari sur iOS ne connaît pas les raccourcis déclarés dans le manifeste : la seule
+    // voie qui reste est de créer soi-même un raccourci vers l'adresse de l'onglet. Or une
+    // application installée n'affiche aucune barre d'adresse — c'est donc ici, et nulle
+    // part ailleurs, que le chauffeur peut la lire.
+    render(<App />);
+    await attendreDemarrage();
+    await attendreEcran('#/reglages', 'Réglages');
+
+    const adresse = await screen.findByTestId('adresse-raccourci', {}, { timeout: DELAI });
+    // On vérifie la FIN de l'adresse : l'origine et le sous-répertoire dépendent du
+    // déploiement, alors que l'onglet est la partie qui doit rester stable.
+    expect(adresse).toHaveTextContent(/#\/instantane$/);
+  });
+
   it('ouvre l’aide et la conformité', async () => {
     render(<App />);
     await attendreDemarrage();
@@ -253,6 +277,30 @@ describe('routes', () => {
     expect(screen.getByText('TVA applicable au transport de personnes')).toBeInTheDocument();
     // La mention de franchise est rappelée à plusieurs endroits de la page.
     expect(screen.getAllByText(/293 B du CGI/).length).toBeGreaterThan(0);
+  });
+
+  it('ouvre l’onglet Instantané sans passer par la racine, ce sur quoi repose un raccourci', async () => {
+    // Tous les autres tests de ce fichier amènent l'application à la racine PUIS changent de
+    // route. Un raccourci d'écran d'accueil fait exactement l'inverse : l'application démarre
+    // alors que l'adresse porte DÉJÀ l'onglet. C'est un démarrage à froid sur une route
+    // profonde, et rien ne le couvrait — or c'est tout ce qu'un raccourci sait faire.
+    //
+    // Ce que ce test protège : le jour où la route change de nom, le raccourci installé sur le
+    // téléphone ouvrirait silencieusement l'assistant de création, puisque la route « * »
+    // ramène tout chemin inconnu vers « /nouveau ». Aucune erreur ne serait levée nulle part,
+    // et le défaut ne se verrait que sur le téléphone du chauffeur, devant un client qui attend.
+    //
+    // L'adresse est donc posée AVANT le rendu, contrairement à ce que fait `attendreEcran`.
+    window.location.hash = '#/instantane';
+    render(<App />);
+    await attendreDemarrage();
+
+    // On attend un texte propre à l'onglet : « Instantané » figure aussi dans la barre
+    // d'onglets, donc l'attendre ne prouverait pas que l'écran correspondant est ouvert.
+    expect(
+      await screen.findByText('Aucun profil instantané', {}, { timeout: DELAI }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Nouveau bon de commande')).toBeNull();
   });
 });
 

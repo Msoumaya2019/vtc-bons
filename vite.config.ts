@@ -81,6 +81,33 @@ export default defineConfig({
             purpose: 'maskable',
           },
         ],
+        // Raccourci d'écran d'accueil : un appui long sur l'icône de l'application
+        // installée ouvre directement l'onglet Instantané, au lieu de laisser le
+        // chauffeur traverser l'assistant de création. C'est le seul gain de gestes
+        // que la plateforme autorise — un raccourci ne peut pas émettre le bon à la
+        // place du chauffeur, il ne fait qu'ouvrir l'application au bon endroit.
+        //
+        // Le dièse est essentiel : l'application utilise un HashRouter, et c'est la
+        // seule partie de l'adresse que le serveur ne voit pas. GitHub Pages renvoie
+        // donc bien index.html, et c'est l'application qui lit l'onglet demandé.
+        //
+        // Portée : l'adresse doit rester DANS le périmètre déclaré par `scope`, sinon
+        // le navigateur ignore le raccourci sans le dire. Un fragment n'étant pas un
+        // chemin, « ./#/instantane » reste dans « ./ ».
+        //
+        // Réservé à Chrome/Edge sous Android (84+) et au Chrome de bureau (96+).
+        // Safari sur iOS ne connaît PAS ce mécanisme : le raccourci n'y apparaîtra
+        // pas, et l'adresse directe reste alors le seul moyen. Ne pas s'en étonner.
+        shortcuts: [
+          {
+            name: 'Bon instantané',
+            short_name: 'Instantané',
+            description:
+              'Ouvrir les profils prêts, pour émettre un bon en un seul geste à l’arrivée du client.',
+            url: './#/instantane',
+            icons: [{ src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' }],
+          },
+        ],
       },
       workbox: {
         // Préchargement intégral de l'app shell : l'application doit démarrer en mode avion.

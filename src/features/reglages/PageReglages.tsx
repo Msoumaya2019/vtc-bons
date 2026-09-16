@@ -746,6 +746,22 @@ export function PageReglages() {
         </Bandeau>
       ) : null}
 
+      {/* Adresse directe de l'onglet Instantané.
+          Elle n'est pas décorative : Safari sur iOS ne connaît pas les raccourcis du
+          manifeste, et le seul moyen d'y obtenir un accès direct depuis l'écran d'accueil
+          est de créer soi-même un raccourci vers cette adresse. Encore faut-il pouvoir la
+          lire — or une application installée n'affiche aucune barre d'adresse, et le
+          dièse est justement la partie qu'on ne peut pas deviner. */}
+      <div className="pt-2 text-center">
+        <p className="texte-muet">Adresse directe de l’onglet Instantané</p>
+        <p
+          className="texte-muet select-all break-all font-mono text-xs"
+          data-testid="adresse-raccourci"
+        >
+          {adresseRaccourci()}
+        </p>
+      </div>
+
       {/* Repère de version. Il n'est pas décoratif : un onglet ou une application déjà
           ouverts continuent d'exécuter l'ancien code après une mise à jour, si bien
           qu'un défaut DÉJÀ corrigé peut être signalé une seconde fois — c'est arrivé.
@@ -789,4 +805,16 @@ function libelleVersion(): string {
   if (typeof __DATE_COMMIT__ !== 'string' || __DATE_COMMIT__ === '') return 'Version inconnue';
   const [annee, mois, jour] = __DATE_COMMIT__.split('-');
   return `Version du ${jour}/${mois}/${annee} (${__COMMIT__})`;
+}
+
+/**
+ * Adresse qui ouvre directement l'onglet Instantané.
+ *
+ * Elle est construite à partir de l'adresse réelle de la page, et non écrite en dur :
+ * l'application est publiée dans un sous-répertoire (`/vtc-bons/`), qui changerait si le
+ * dépôt était renommé. Seul l'onglet est fixe — et c'est aussi la seule partie que le
+ * serveur ne voit pas, puisqu'elle suit le dièse.
+ */
+function adresseRaccourci(): string {
+  return `${window.location.origin}${window.location.pathname}#/instantane`;
 }

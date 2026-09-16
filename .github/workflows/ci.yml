@@ -75,6 +75,13 @@ jobs:
       - name: Build de production
         run: npm run build
 
+      - name: Vérifier le raccourci d’écran d’accueil
+        # Le manifeste est le seul véhicule du raccourci, et un raccourci mal formé est
+        # écarté en silence par le navigateur : rien dans l'application ne le signalerait.
+        # Ce contrôle lit le manifeste réellement publié, et vérifie que l'onglet qu'il
+        # vise est bien déclaré dans src/App.tsx — deux fichiers que rien ne reliait.
+        run: npm run verifier:raccourci
+
       - name: Conserver la version web
         uses: actions/upload-artifact@v4
         with:

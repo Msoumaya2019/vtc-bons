@@ -19,6 +19,7 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"tests/**/*.ts\"",
     "icons": "node scripts/generate-icons.mjs",
     "verifier:binaires": "node scripts/verifier-rollup.mjs",
+    "verifier:raccourci": "node scripts/verifier-raccourci.mjs",
     "cap:sync": "npm run build && cap sync",
     "cap:ios": "npm run build && cap sync ios && cap open ios",
     "cap:android": "npm run build && cap sync android && cap open android"

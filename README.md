@@ -35,6 +35,9 @@ Si votre position n'est pas disponible — hors connexion, autorisation refusée
 prise en charge enregistré dans le profil est utilisé, et l'application vous le dit. Le bon
 est émis dans les deux cas.
 
+Un raccourci d'écran d'accueil ouvre cet onglet directement, sans traverser l'assistant :
+voir « Raccourci d'écran d'accueil », plus bas.
+
 **L'adresse assistée.** Vous tapez les premières lettres du lieu de prise en charge : les
 propositions s'affichent, comme sur une carte. Un bouton **« Ma position »** remplit
 l'adresse de départ sans que vous ayez à la saisir. La distance et la durée du trajet se
@@ -198,6 +201,7 @@ Le guide pas à pas, sans ligne de commande, se trouve dans **[SETUP.md](SETUP.m
 | `npm run format` | Mise en forme automatique |
 | `npm run icons` | Régénère les icônes de l'application |
 | `npm run verifier:binaires` | Vérifie que les binaires natifs de Rollup suivent sa version |
+| `npm run verifier:raccourci` | Vérifie le raccourci d'écran d'accueil dans le manifeste publié |
 | `npm run cap:android` | Ouvre le projet Android dans Android Studio |
 | `npm run cap:ios` | Ouvre le projet iOS dans Xcode |
 
@@ -205,7 +209,7 @@ Le guide pas à pas, sans ligne de commande, se trouve dans **[SETUP.md](SETUP.m
 
 ## Ce que les tests vérifient
 
-383 tests, répartis en seize fichiers. Ils ne mesurent pas la quantité de code, mais les
+385 tests, répartis en seize fichiers. Ils ne mesurent pas la quantité de code, mais les
 endroits où une erreur coûte cher.
 
 | Fichier | Ce qu'il protège |
@@ -222,7 +226,7 @@ endroits où une erreur coûte cher.
 | `champ-adresse.test.tsx` | Le champ d'adresse : choix d'une proposition, parcours au clavier, et Échap qui referme la liste **sans** fermer la fenêtre qui l'abrite |
 | `instantane.test.ts` | Le bon instantané : conversion du prix TTC en HT (sans quoi le client paierait la TVA deux fois), repli sur l'adresse du profil quand la position manque, refus d'un profil sans prix (un bon à 0 € est légalement valable — le contrôle de conformité ne peut donc pas l'attraper), et surtout l'absence de brouillon laissé derrière un échec |
 | `instantane-ecran.test.tsx` | L'onglet Instantané : profil incomplet annoncé **avant** l'appui, génération en un clic, réserve qui reste affichée, et relecture d'une fiche client enregistrée avant cette fonctionnalité |
-| `app.test.tsx` | Le démarrage réel de l'application : montage, routage, charte, mode contrôle, et le repère de version des Réglages — sans lui, un essai sur le téléphone ne dit pas quelle version a été essayée. Vérifie aussi la saisie des montants : un champ qui réécrit sa valeur à chaque frappe se réécrit sous le doigt, le curseur repart à la fin et un chiffre tapé après la virgule ne change rien — invisible au clavier d'un ordinateur, systématique sur un téléphone |
+| `app.test.tsx` | Le démarrage réel de l'application : montage, routage, charte, mode contrôle, et le repère de version des Réglages — sans lui, un essai sur le téléphone ne dit pas quelle version a été essayée. Vérifie aussi la saisie des montants : un champ qui réécrit sa valeur à chaque frappe se réécrit sous le doigt, le curseur repart à la fin et un chiffre tapé après la virgule ne change rien — invisible au clavier d'un ordinateur, systématique sur un téléphone. Vérifie enfin l'ouverture **directe** sur un onglet, sans passer par la racine : c'est tout ce que sait faire un raccourci d'écran d'accueil, et la route « * » ramènerait sinon vers l'assistant de création sans le moindre message |
 | `format.test.ts`, `validation.test.ts`, `ui.test.tsx` | Dates en heure locale, identifiants administratifs, composants d'interface — dont la saisie d'un montant : champ vide quand le montant est nul, texte conservé tel qu'il est tapé, contenu sélectionné au focus, et saisie illisible gardée à l'écran plutôt que remplacée |
 
 Le test le plus utile est peut-être `app.test.tsx` : c'est le seul capable de détecter une
@@ -307,6 +311,40 @@ la permission Internet. Ces deux dossiers étant régénérés à chaque compila
 déclarations sont réinjectées par les workflows, qui vérifient ensuite qu'elles ont bien
 été écrites : un manifeste incomplet arrête la compilation plutôt que de produire un APK
 dont le bouton « Ma position » échouerait silencieusement.
+
+### Raccourci d'écran d'accueil
+
+L'application déclare un raccourci : un **appui long sur l'icône installée** propose
+« Bon instantané », qui ouvre directement l'onglet, sans traverser l'assistant de création.
+
+**Un raccourci n'émet pas le bon.** Il ne peut qu'ouvrir l'application au bon endroit : le
+geste sur le client reste à faire. Ce n'est pas une limite de cette application, mais de la
+plateforme. Un widget d'écran d'accueil s'exécute dans un autre processus : il n'a accès ni
+au JavaScript de l'application, ni à sa base locale, ni à la position, et il ne peut pas
+désigner un client. Le bon ne peut donc pas exister sans le geste du chauffeur — et c'est
+préférable, puisqu'un numéro est consommé à chaque émission et que la séquence ne doit pas
+comporter de trou.
+
+| Plateforme | Ce qui fonctionne |
+| --- | --- |
+| Android, Chrome 84 et suivants | Appui long sur l'icône installée |
+| Chrome et Edge de bureau, 96 et suivants | Raccourci proposé dans le menu de l'application |
+| **iPhone et iPad** | **Rien** : Safari ne connaît pas les raccourcis du manifeste |
+| Applications natives (APK, IPA) | Rien non plus : elles ne lisent pas ce manifeste |
+
+Sur iPhone, la seule voie est de créer le raccourci soi-même, avec l'application
+**Raccourcis** et l'action « Ouvrir des URL ». L'adresse à employer est affichée tout en bas
+des Réglages, sous la version : une application installée n'affiche aucune barre d'adresse,
+et le dièse est précisément la partie qu'on ne peut pas deviner. Cette ouverture passe par
+Safari plutôt que par l'application installée. Le stockage de WebKit étant rattaché à
+l'origine et non à l'application — le quota est le même dans les deux cas — les données
+devraient s'y retrouver ; à confirmer sur l'appareil.
+
+La compilation vérifie ce raccourci (`npm run verifier:raccourci`) en lisant le manifeste
+**réellement publié**, et refuse une adresse hors de la portée déclarée, une adresse sans
+dièse, ou un onglet qui n'existe pas dans `src/App.tsx`. Sans ce contrôle, un raccourci mal
+formé serait écarté en silence par le navigateur, et le défaut n'apparaîtrait que sur le
+téléphone, devant un client qui attend.
 
 ---
 
