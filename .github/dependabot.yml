@@ -1,0 +1,51 @@
+version: 2
+updates:
+  # Dépendances JavaScript. Regroupées pour éviter une avalanche de pull requests :
+  # une seule PR pour l'outillage de développement, une pour les bibliothèques qui
+  # partent réellement dans l'application.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Paris
+    open-pull-requests-limit: 5
+    versioning-strategy: increase
+    groups:
+      outillage:
+        patterns:
+          - 'eslint*'
+          - '@typescript-eslint/*'
+          - 'prettier'
+          - 'typescript'
+          - 'vite'
+          - 'vitest'
+          - '@vitejs/*'
+          - '@testing-library/*'
+          - 'jsdom'
+          - 'tailwindcss'
+          - 'postcss'
+          - 'autoprefixer'
+      application:
+        patterns:
+          - 'react'
+          - 'react-dom'
+          - 'react-router-dom'
+          - 'dexie'
+          - 'fflate'
+          - '@react-pdf/*'
+          - 'vite-plugin-pwa'
+    labels:
+      - dépendances
+
+  # Les actions GitHub elles-mêmes : elles évoluent et leurs anciennes versions
+  # finissent par être refusées.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    labels:
+      - dépendances
+      - ci

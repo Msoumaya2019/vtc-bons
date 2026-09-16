@@ -1,0 +1,112 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* La couleur d'accent est pilotée à l'exécution depuis les Réglages. */
+    --accent: #1d4ed8;
+    --accent-soft: #eff6ff;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-slate-100 text-slate-900 antialiased;
+    font-family:
+      -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    body {
+      @apply bg-slate-950 text-slate-100;
+    }
+  }
+
+  /* Zones sûres iOS : la barre d'onglets ne doit jamais passer sous l'indicateur d'accueil. */
+  .zone-sure-bas {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .zone-sure-haut {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
+
+@layer components {
+  .carte {
+    @apply rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900;
+  }
+
+  .btn {
+    @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primaire {
+    background-color: var(--accent);
+    @apply text-white;
+  }
+  .btn-primaire:not(:disabled):hover {
+    filter: brightness(1.08);
+  }
+
+  .btn-secondaire {
+    @apply border border-slate-300 bg-white text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100;
+  }
+  .btn-secondaire:not(:disabled):hover {
+    @apply bg-slate-50 dark:bg-slate-800;
+  }
+
+  .btn-danger {
+    @apply border border-red-300 bg-white text-red-700 dark:border-red-900 dark:bg-slate-900 dark:text-red-300;
+  }
+  .btn-danger:not(:disabled):hover {
+    @apply bg-red-50 dark:bg-red-950;
+  }
+
+  .btn-fantome {
+    @apply text-slate-600 dark:text-slate-300;
+  }
+  .btn-fantome:not(:disabled):hover {
+    @apply bg-slate-100 dark:bg-slate-800;
+  }
+
+  .btn-petit {
+    @apply min-h-[36px] rounded-lg px-3 text-xs;
+  }
+
+  .champ {
+    @apply block w-full min-h-[44px] rounded-xl border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500;
+  }
+
+  .etiquette {
+    @apply mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200;
+  }
+
+  .aide-champ {
+    @apply mt-1 text-xs text-slate-500 dark:text-slate-400;
+  }
+
+  .erreur-champ {
+    @apply mt-1 text-xs font-medium text-red-600 dark:text-red-400;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold;
+  }
+
+  .lien-accent {
+    color: var(--accent);
+    @apply font-medium underline-offset-2 hover:underline;
+  }
+
+  .section-titre {
+    @apply text-lg font-bold text-slate-900 dark:text-slate-50;
+  }
+
+  .texte-muet {
+    @apply text-sm text-slate-500 dark:text-slate-400;
+  }
+}

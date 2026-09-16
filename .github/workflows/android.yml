@@ -1,0 +1,94 @@
+name: Android — APK et App Bundle
+
+# Produit les trois fichiers Android, TOUS NON SIGNÉS :
+#   • app-debug.apk            pour tester rapidement (signé avec la clé de debug)
+#   • app-release-unsigned.apk à signer soi-même, par exemple avec eSign
+#   • app-release.aab          à déposer sur Google Play Console
+#
+# Aucune clé de signature n'est stockée dans ce dépôt, qui est public.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  construire:
+    name: Construire les artefacts Android
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          check-latest: true
+          cache: npm
+
+      - name: Installer Java 21
+        # Capacitor 8 s'appuie sur Android Gradle Plugin 8.x, qui exige au minimum
+        # Java 17. Java 21 est le choix recommandé par Capacitor.
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Installer le SDK Android
+        uses: android-actions/setup-android@v3
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Construire l'application web
+        run: npm run build
+
+      - name: Générer le projet Android
+        # `android/` n'est pas versionné : il est recréé ici, à chaque compilation.
+        run: |
+          npx cap add android
+          npx cap sync android
+
+      - name: APK de test
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: APK de production, non signé
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: App Bundle, non signé
+        working-directory: android
+        run: ./gradlew bundleRelease --no-daemon --stacktrace
+
+      - name: Vérifier que les trois fichiers existent
+        run: |
+          test -f android/app/build/outputs/apk/debug/app-debug.apk
+          test -f android/app/build/outputs/apk/release/app-release-unsigned.apk
+          test -f android/app/build/outputs/bundle/release/app-release.aab
+          echo "Les trois artefacts sont présents."
+
+      - name: Publier l'APK de test
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Publier l'APK de production non signé
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk-release-non-signe
+          path: android/app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: error
+
+      - name: Publier l'App Bundle non signé
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-aab-non-signe
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error

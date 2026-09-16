@@ -1,0 +1,85 @@
+name: iOS — IPA non signé
+
+# Produit un IPA NON SIGNÉ, destiné à être signé soi-même — par exemple avec eSign.
+#
+# Pourquoi non signé ? Signer exigerait un certificat Apple et un profil de
+# provisionnement, c'est-à-dire des secrets. Ce dépôt est public : aucun certificat,
+# aucun mot de passe, aucun profil n'y est stocké. La signature est faite localement,
+# sur la machine de l'utilisateur, au moment de l'installation.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  construire:
+    name: Construire l'IPA non signé
+    # macos-15 est nécessaire : Capacitor 8 exige Xcode 16, absent de macos-14.
+    runs-on: macos-15
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          check-latest: true
+          cache: npm
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Construire l'application web
+        run: npm run build
+
+      - name: Générer le projet iOS
+        # `ios/` n'est pas versionné : il est recréé ici, à chaque compilation.
+        # CocoaPods est déjà présent sur les exécuteurs macOS de GitHub.
+        run: |
+          npx cap add ios
+          npx cap sync ios
+
+      - name: Compiler sans signature
+        working-directory: ios/App
+        run: |
+          xcodebuild \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Empaqueter l'IPA
+        # Un IPA n'est qu'une archive ZIP contenant un dossier `Payload/` qui
+        # contient lui-même l'application `.app`.
+        run: |
+          APP=$(find ios/App/build/Build/Products/Release-iphoneos -maxdepth 1 -name '*.app' | head -n 1)
+          if [ -z "$APP" ]; then
+            echo "::error::Aucune application compilée n'a été trouvée."
+            exit 1
+          fi
+
+          rm -rf Payload
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qry vtc-bons-non-signe.ipa Payload
+          rm -rf Payload
+
+          ls -lh vtc-bons-non-signe.ipa
+          unzip -l vtc-bons-non-signe.ipa | head -n 20
+
+      - name: Publier l'IPA non signé
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa-non-signe
+          path: vtc-bons-non-signe.ipa
+          if-no-files-found: error

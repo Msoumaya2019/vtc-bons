@@ -1,0 +1,219 @@
+/**
+ * Démarrage de l'application, bout en bout.
+ *
+ * Les autres fichiers testent des unités. Celui-ci monte l'application RÉELLE, avec ses
+ * fournisseurs, son routeur et sa base : c'est le seul test capable de détecter une
+ * erreur de câblage — un contexte mal placé, une route absente, un écran qui plante au
+ * premier rendu. Ce genre de défaut ne se voit ni au typecheck, ni au build.
+ */
+
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import { App } from '../src/App';
+import { db, effacerToutesLesDonnees, saveSettings } from '../src/lib/db';
+import { bonTest, reglagesTest } from './aides';
+
+/** Amène l'application sur une route, puis attend que l'écran correspondant s'affiche. */
+async function attendreEcran(chemin: string, texteAttendu: RegExp | string) {
+  window.location.hash = chemin;
+  await screen.findByText(texteAttendu);
+}
+
+/** L'application chargée : l'écran d'attente doit avoir disparu. */
+async function attendreDemarrage() {
+  await waitFor(() => {
+    expect(screen.queryByText('Ouverture de vos données locales…')).toBeNull();
+  });
+}
+
+let erreursConsole: string[] = [];
+
+beforeEach(async () => {
+  await effacerToutesLesDonnees();
+  window.location.hash = '#/';
+
+  // React signale dans la console toute erreur de rendu ou de prop. Un démarrage propre
+  // ne doit rien y écrire : ce contrôle attrape les défauts qu'aucune assertion ne
+  // penserait à couvrir.
+  erreursConsole = [];
+  vi.spyOn(console, 'error').mockImplementation((...arguments_) => {
+    erreursConsole.push(arguments_.map(String).join(' '));
+  });
+});
+
+describe('démarrage', () => {
+  it('affiche l’écran d’attente, puis l’application', async () => {
+    render(<App />);
+
+    // Premier rendu : la base n'est pas encore ouverte.
+    expect(screen.getByText('Ouverture de vos données locales…')).toBeInTheDocument();
+
+    await attendreDemarrage();
+    expect(screen.getByText('vtc-bons')).toBeInTheDocument();
+  });
+
+  it('ne provoque aucune erreur au montage', async () => {
+    render(<App />);
+    await attendreDemarrage();
+
+    expect(erreursConsole).toEqual([]);
+  });
+
+  it('crée les réglages par défaut au premier lancement', async () => {
+    render(<App />);
+    await attendreDemarrage();
+
+    // La base doit contenir l'enregistrement de réglages : sans lui, l'application
+    // rechargerait un écran vide à chaque ouverture.
+    expect(await db.settings.get('app')).toBeDefined();
+  });
+
+  it('présente les cinq onglets de navigation', async () => {
+    render(<App />);
+    await attendreDemarrage();
+
+    const navigation = screen.getByRole('navigation', { name: 'Navigation principale' });
+    for (const libelle of ['Nouveau', 'Mes bons', 'Mes factures', 'Clients', 'Réglages']) {
+      expect(navigation).toHaveTextContent(libelle);
+    }
+  });
+
+  it('donne accès à l’aide depuis l’en-tête', async () => {
+    render(<App />);
+    await attendreDemarrage();
+
+    expect(screen.getByRole('link', { name: 'Aide et conformité' })).toBeInTheDocument();
+  });
+});
+
+describe('charte', () => {
+  it('applique la couleur d’accent enregistrée dans les réglages', async () => {
+    await saveSettings(reglagesTest({ couleurAccent: '#0f766e' }));
+
+    render(<App />);
+    await attendreDemarrage();
+
+    await waitFor(() => {
+      expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#0f766e');
+    });
+  });
+
+  it('retombe sur le bleu par défaut si la couleur est absente', async () => {
+    await saveSettings(reglagesTest({ couleurAccent: '' }));
+
+    render(<App />);
+    await attendreDemarrage();
+
+    await waitFor(() => {
+      expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#1d4ed8');
+    });
+  });
+});
+
+describe('routes', () => {
+  it('redirige la racine vers l’assistant de création', async () => {
+    render(<App />);
+    await attendreDemarrage();
+
+    expect(await screen.findByText('Nouveau bon de commande')).toBeInTheDocument();
+    expect(screen.getByText('Client et créneau')).toBeInTheDocument();
+  });
+
+  it('ramène une route inconnue vers l’assistant', async () => {
+    render(<App />);
+    await attendreDemarrage();
+
+    await attendreEcran('#/route-qui-nexiste-pas', 'Nouveau bon de commande');
+  });
+
+  it('ouvre la liste des bons, vide au premier lancement', async () => {
+    render(<App />);
+    await attendreDemarrage();
+
+    await attendreEcran('#/bons', 'Aucun bon de commande');
+  });
+
+  it('ouvre les factures, vides au premier lancement', async () => {
+    render(<App />);
+    await attendreDemarrage();
+
+    await attendreEcran('#/factures', 'Aucune facture');
+  });
+
+  it('ouvre les clients, vides au premier lancement', async () => {
+    render(<App />);
+    await attendreDemarrage();
+
+    await attendreEcran('#/clients', 'Aucun client enregistré');
+  });
+
+  it('ouvre les réglages', async () => {
+    render(<App />);
+    await attendreDemarrage();
+
+    await attendreEcran('#/reglages', 'Réglages');
+  });
+
+  it('ouvre l’aide et la conformité', async () => {
+    render(<App />);
+    await attendreDemarrage();
+
+    // On attend un titre propre à la page : « Aide et conformité » figure aussi dans
+    // l'en-tête, donc l'attendre ne prouverait pas que la page est chargée.
+    await attendreEcran('#/aide', 'Pourquoi le bon de commande est un document important');
+    expect(screen.getByText('TVA applicable au transport de personnes')).toBeInTheDocument();
+    // La mention de franchise est rappelée à plusieurs endroits de la page.
+    expect(screen.getAllByText(/293 B du CGI/).length).toBeGreaterThan(0);
+  });
+});
+
+describe('mode contrôle', () => {
+  it('présente le justificatif d’une course, en plein écran', async () => {
+    await db.bons.put(bonTest());
+
+    render(<App />);
+    await attendreDemarrage();
+
+    await attendreEcran('#/controle/bon-1', 'Justificatif de réservation préalable');
+
+    // Le lieu figure deux fois : dans son bloc principal, et dans la liste des mentions.
+    // On vérifie qu'il est bien présent dans le bloc mis en avant.
+    const blocLieu = screen.getByText('Lieu de prise en charge').closest('section');
+    expect(blocLieu).toHaveTextContent('12 rue de la Gare, 95300 Pontoise');
+
+    expect(screen.getByText('Mode contrôle')).toBeInTheDocument();
+    expect(screen.getByText('Arrêté du 6 août 2025 — art. L. 3120-2 du Code des transports')).toBeInTheDocument();
+  });
+
+  it('masque la navigation : l’agent ne doit voir que la course concernée', async () => {
+    await db.bons.put(bonTest());
+
+    render(<App />);
+    await attendreDemarrage();
+
+    await attendreEcran('#/controle/bon-1', 'Justificatif de réservation préalable');
+
+    expect(screen.queryByRole('navigation', { name: 'Navigation principale' })).toBeNull();
+  });
+
+  it('affiche les sept mentions réglementaires', async () => {
+    await db.bons.put(bonTest());
+
+    render(<App />);
+    await attendreDemarrage();
+
+    await attendreEcran('#/controle/bon-1', 'Justificatif de réservation préalable');
+
+    expect(
+      screen.getByText(/Les 7 mentions obligatoires prévues par l’article 1er/),
+    ).toBeInTheDocument();
+  });
+
+  it('ne plante pas si le bon n’existe pas', async () => {
+    render(<App />);
+    await attendreDemarrage();
+
+    await attendreEcran('#/controle/bon-inexistant', 'Justificatif introuvable.');
+    expect(screen.getByRole('button', { name: 'Revenir' })).toBeInTheDocument();
+  });
+});

@@ -1,0 +1,33 @@
+# Normalisation des fins de ligne.
+#
+# Le développement se fait sous Windows et la compilation sous Linux : sans cette règle,
+# Git convertit les fins de ligne selon la plateforme, ce qui produit des différences
+# fantômes dans les diffs et peut faire échouer l'analyse statique sur des fichiers
+# pourtant identiques.
+#
+# On stocke donc tout en LF dans le dépôt, et on laisse Git convertir au moment du
+# checkout pour les fichiers qui, eux, exigent vraiment du CRLF.
+* text=auto eol=lf
+
+# Fichiers qui doivent impérativement rester en CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Fichiers binaires : aucune conversion, aucune fusion automatique.
+*.png binary
+*.jpg binary
+*.ico binary
+*.pdf binary
+*.keystore binary
+*.jks binary
+*.p12 binary
+*.mobileprovision binary
+*.ipa binary
+*.apk binary
+*.aab binary
+
+# Les fichiers de verrouillage ne doivent jamais être fusionnés à la main : une fusion
+# approximative produirait un arbre de dépendances incohérent. En cas de conflit, on
+# régénère le fichier.
+package-lock.json -diff linguist-generated=true

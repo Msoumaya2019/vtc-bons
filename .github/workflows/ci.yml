@@ -1,0 +1,75 @@
+name: Intégration continue
+
+# Vérifie chaque modification : c'est ce qui garantit qu'une version publiée
+# n'embarque jamais un calcul de TVA faux ou un numéro de facture en double.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Le strict nécessaire : ce workflow ne fait que lire le dépôt.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verifier:
+    name: Lint, types, tests et build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          check-latest: true
+          cache: npm
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Vérifier qu'aucun secret n'est versionné
+        # Le dépôt est public : un keystore ou un fichier .env committé par erreur
+        # serait exposé définitivement. On échoue AVANT de compiler quoi que ce soit.
+        run: |
+          fichiers_signature=$(git ls-files | grep -Ei '\.(keystore|jks|p12|pfx|mobileprovision|cer|key)$' || true)
+          if [ -n "$fichiers_signature" ]; then
+            echo "::error::Fichier(s) de signature présents dans le dépôt :"
+            echo "$fichiers_signature"
+            exit 1
+          fi
+
+          fichiers_env=$(git ls-files | grep -E '(^|/)\.env' | grep -v '\.env\.example$' || true)
+          if [ -n "$fichiers_env" ]; then
+            echo "::error::Fichier(s) d'environnement présents dans le dépôt :"
+            echo "$fichiers_env"
+            exit 1
+          fi
+
+          echo "Aucun secret détecté."
+
+      - name: Analyse statique
+        run: npm run lint
+
+      - name: Vérification des types
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm run test:run
+
+      - name: Build de production
+        run: npm run build
+
+      - name: Conserver la version web
+        uses: actions/upload-artifact@v4
+        with:
+          name: vtc-bons-web
+          path: dist
+          retention-days: 14

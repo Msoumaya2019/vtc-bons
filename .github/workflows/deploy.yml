@@ -1,0 +1,63 @@
+name: Publier la version web
+
+# Publie l'application sur GitHub Pages. Elle est alors utilisable depuis un simple
+# navigateur, et installable sur l'écran d'accueil d'un téléphone (PWA).
+#
+# Prérequis, à faire une fois : Settings > Pages > Source = « GitHub Actions ».
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  construire:
+    name: Construire le site
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          check-latest: true
+          cache: npm
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Préparer GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Téléverser le site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deployer:
+    name: Mettre en ligne
+    needs: construire
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.mise-en-ligne.outputs.page_url }}
+
+    steps:
+      - name: Publier
+        id: mise-en-ligne
+        uses: actions/deploy-pages@v4

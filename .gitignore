@@ -1,0 +1,32 @@
+# Dépendances
+node_modules/
+
+# Build
+dist/
+dist-ssr/
+*.local
+
+# Environnement — aucun secret ne doit jamais être versionné
+.env
+.env.*
+!.env.example
+
+# Signature : ne jamais committer un keystore ni un certificat
+*.keystore
+*.jks
+*.p12
+*.mobileprovision
+*.cer
+
+# Plateformes natives générées par la CI (Capacitor)
+ios/
+android/
+
+# Éditeurs et système
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+coverage/

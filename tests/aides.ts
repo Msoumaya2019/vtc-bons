@@ -1,0 +1,160 @@
+import { parametresParDefaut } from '../src/lib/db';
+import { snapshotClient, snapshotEmetteur } from '../src/lib/snapshots';
+import { calculerTotaux } from '../src/lib/tva';
+import type { Bon, Client, Facture, LignePrestation, Settings } from '../src/types';
+
+/** Réglages complets et valides, pour les tests. */
+export function reglagesTest(surcharge: Partial<Settings> = {}): Settings {
+  return {
+    ...parametresParDefaut(),
+    raisonSociale: 'Transports Dupont',
+    formeJuridique: 'Entreprise individuelle',
+    adresse: '1 rue de la Gare',
+    codePostal: '95300',
+    ville: 'Pontoise',
+    telephone: '06 12 34 56 78',
+    email: 'contact@transports-dupont.fr',
+    siren: '123456789',
+    siret: '12345678900012',
+    numeroREVTC: 'EVTC0123456789',
+    numeroTVAIntracom: 'FR12345678901',
+    assureurNom: 'Assur VTC',
+    assureurContrat: 'RC-2026-0042',
+    assureurCouvertureGeographique: 'Union européenne',
+    ...surcharge,
+  };
+}
+
+export function clientTest(surcharge: Partial<Client> = {}): Client {
+  return {
+    id: 'client-1',
+    type: 'particulier',
+    civilite: 'M.',
+    nom: 'Martin Leroy',
+    adresse: '5 avenue Victor Hugo',
+    codePostal: '75016',
+    ville: 'Paris',
+    pays: 'France',
+    telephone: '07 98 76 54 32',
+    email: 'martin.leroy@example.fr',
+    siret: '',
+    numeroTVAIntracom: '',
+    contactSurPlace: '',
+    notes: '',
+    parDefaut: true,
+    creeLe: '2026-01-01T10:00:00.000Z',
+    modifieLe: '2026-01-01T10:00:00.000Z',
+    supprime: false,
+    ...surcharge,
+  };
+}
+
+export function ligneTest(surcharge: Partial<LignePrestation> = {}): LignePrestation {
+  return {
+    id: 'ligne-1',
+    libelle: 'Transport de personnes',
+    quantite: 1,
+    prixUnitaireCentimes: 10000,
+    tauxTVA: 10,
+    estDebours: false,
+    ...surcharge,
+  };
+}
+
+/**
+ * Bon émis et conforme : les 7 mentions de l'arrêté du 6 août 2025 sont renseignées.
+ * La réservation est bien ANTÉRIEURE à la prise en charge.
+ */
+export function bonTest(surcharge: Partial<Bon> = {}): Bon {
+  const reglages = reglagesTest();
+  const client = clientTest();
+  return {
+    id: 'bon-1',
+    numero: 'BC-2026-0001',
+    statut: 'emis',
+    clientId: client.id,
+    clientSnapshot: snapshotClient(client),
+    emetteurSnapshot: snapshotEmetteur(reglages),
+    creeLe: '2026-03-14T08:00:00.000Z',
+    dateReservation: '2026-03-14',
+    heureReservation: '08:00',
+    datePriseEnCharge: '2026-03-15',
+    heurePriseEnCharge: '09:30',
+    lieuPriseEnCharge: '12 rue de la Gare, 95300 Pontoise',
+    destination: 'Aéroport Charles-de-Gaulle, terminal 2E',
+    distanceKm: 42,
+    typePrestation: 'transfert_aeroport',
+    numeroVolTrain: 'AF1234',
+    terminal: '2E',
+    bagages: '2 valises',
+    nombrePassagers: 2,
+    vehiculeMarque: 'Mercedes',
+    vehiculeModele: 'Classe E',
+    vehiculeImmatriculation: 'AB-123-CD',
+    vehiculeCouleur: 'Noir',
+    nomConducteur: '',
+    lignes: [ligneTest()],
+    remiseGlobale: null,
+    modePaiement: 'cb',
+    notesInternes: '',
+    notesClient: '',
+    factureId: null,
+    pdfBlob: null,
+    pdfGenereLe: null,
+    historique: [],
+    supprime: false,
+    supprimeLe: null,
+    ...surcharge,
+  };
+}
+
+/**
+ * Facture émise cohérente : les montants sont calculés par le moteur TVA, jamais saisis
+ * à la main, afin qu'un test qui compare bon et facture compare bien deux calculs.
+ */
+export function factureTest(surcharge: Partial<Facture> = {}): Facture {
+  const reglages = reglagesTest();
+  const client = clientTest();
+  const lignes = [ligneTest()];
+  const totaux = calculerTotaux(lignes, {
+    regimeTVA: reglages.regimeTVA,
+    traitementPeages: reglages.traitementPeages,
+    remiseGlobale: null,
+  });
+
+  return {
+    id: 'facture-1',
+    numero: 'FA-2026-0001',
+    type: 'facture',
+    bonId: 'bon-1',
+    factureOrigineId: null,
+    clientId: client.id,
+    clientSnapshot: snapshotClient(client),
+    emetteurSnapshot: snapshotEmetteur(reglages),
+    dateEmission: '2026-03-16',
+    datePrestation: '2026-03-15',
+    dateEcheance: '2026-04-15',
+    lignes,
+    remiseGlobale: null,
+    montantHT: totaux.totalHT,
+    montantTVA: totaux.totalTVA,
+    montantTTC: totaux.totalTTC,
+    montantDebours: totaux.totalDebours,
+    detailTVA: totaux.detailTVA,
+    mentionTVA: totaux.mentionTVA,
+    conditionsPaiement: reglages.conditionsPaiement,
+    penalitesRetard: reglages.penalitesRetard,
+    escompteTexte: reglages.escompteTexte,
+    mentionSpecifique: '',
+    statut: 'emise',
+    datePaiement: null,
+    moyenPaiement: null,
+    notes: '',
+    pdfBlob: null,
+    pdfGenereLe: null,
+    historique: [],
+    supprime: false,
+    supprimeLe: null,
+    ...surcharge,
+  };
+}
