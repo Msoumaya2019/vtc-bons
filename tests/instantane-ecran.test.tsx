@@ -355,6 +355,41 @@ describe('profil instantané, depuis la fiche client', () => {
     expect(enregistre.instantane.prixTTCcentimes).toBe(9500);
   });
 
+  it('ne réécrit pas le montant sous les doigts du chauffeur', async () => {
+    // Relevé sur un téléphone. Les deux symptômes signalés viennent du même défaut : le
+    // champ se réécrivait à chaque frappe, donc le curseur repartait à la fin et le texte
+    // tapé était remplacé par sa version formatée.
+    //
+    //   - taper un chiffre après « 0,00 » donnait « 0,007 », soit 0,7 centime arrondi à
+    //     1 centime : le montant semblait ne pas bouger ;
+    //   - effacer un caractère de « 0,01 » donnait « 0,0 », aussitôt réécrit « 0,00 » :
+    //     la suppression semblait sans effet.
+    //
+    // Ce test mesure le COMPORTEMENT DU CHAMP, pas la conversion : les valeurs employées
+    // n'ont pas besoin d'être des montants plausibles, seulement d'être retapées telles
+    // quelles.
+    await saveSettings(reglagesTest());
+
+    render(<HarnaisClients />);
+    await screen.findByRole('heading', { name: 'Clients' }, { timeout: DELAI });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ajouter' }));
+    await screen.findByRole('dialog', { name: 'Nouveau client' });
+    fireEvent.click(screen.getByLabelText('Bon instantané'));
+
+    const prix = screen.getByLabelText(/^Prix habituel TTC/) as HTMLInputElement;
+
+    // Effacer un caractère doit laisser « 0,0 » à l'écran, et non le réécrire « 0,00 ».
+    fireEvent.change(prix, { target: { value: '0,0' } });
+    expect(prix.value).toBe('0,0');
+
+    // Et un montant en cours de frappe doit rester tel quel, chiffre après chiffre.
+    fireEvent.change(prix, { target: { value: '9' } });
+    expect(prix.value).toBe('9');
+    fireEvent.change(prix, { target: { value: '95' } });
+    expect(prix.value).toBe('95');
+  });
+
   it('n’affiche pas les champs du profil tant qu’il n’est pas activé', async () => {
     await saveSettings(reglagesTest());
 

@@ -205,7 +205,7 @@ Le guide pas à pas, sans ligne de commande, se trouve dans **[SETUP.md](SETUP.m
 
 ## Ce que les tests vérifient
 
-372 tests, répartis en seize fichiers. Ils ne mesurent pas la quantité de code, mais les
+382 tests, répartis en seize fichiers. Ils ne mesurent pas la quantité de code, mais les
 endroits où une erreur coûte cher.
 
 | Fichier | Ce qu'il protège |
@@ -222,8 +222,8 @@ endroits où une erreur coûte cher.
 | `champ-adresse.test.tsx` | Le champ d'adresse : choix d'une proposition, parcours au clavier, et Échap qui referme la liste **sans** fermer la fenêtre qui l'abrite |
 | `instantane.test.ts` | Le bon instantané : conversion du prix TTC en HT (sans quoi le client paierait la TVA deux fois), repli sur l'adresse du profil quand la position manque, refus d'un profil sans prix (un bon à 0 € est légalement valable — le contrôle de conformité ne peut donc pas l'attraper), et surtout l'absence de brouillon laissé derrière un échec |
 | `instantane-ecran.test.tsx` | L'onglet Instantané : profil incomplet annoncé **avant** l'appui, génération en un clic, réserve qui reste affichée, et relecture d'une fiche client enregistrée avant cette fonctionnalité |
-| `app.test.tsx` | Le démarrage réel de l'application : montage, routage, charte, mode contrôle |
-| `format.test.ts`, `validation.test.ts`, `ui.test.tsx` | Dates en heure locale, identifiants administratifs, composants d'interface |
+| `app.test.tsx` | Le démarrage réel de l'application : montage, routage, charte, mode contrôle. Vérifie aussi la saisie des montants : un champ qui réécrit sa valeur à chaque frappe se réécrit sous le doigt, le curseur repart à la fin et un chiffre tapé après la virgule ne change rien — invisible au clavier d'un ordinateur, systématique sur un téléphone |
+| `format.test.ts`, `validation.test.ts`, `ui.test.tsx` | Dates en heure locale, identifiants administratifs, composants d'interface — dont la saisie d'un montant : champ vide quand le montant est nul, texte conservé tel qu'il est tapé, contenu sélectionné au focus, et saisie illisible gardée à l'écran plutôt que remplacée |
 
 Le test le plus utile est peut-être `app.test.tsx` : c'est le seul capable de détecter une
 erreur de câblage — un contexte mal placé, une route oubliée, un écran qui plante au

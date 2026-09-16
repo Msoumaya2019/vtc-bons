@@ -5,6 +5,7 @@ import type {
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from 'react';
+import { formatSaisieEuros, parseSaisieEuros } from '../../lib/money';
 
 interface PropsChamp {
   label: string;
@@ -52,6 +53,77 @@ export function Champ({
 
 export function Saisie({ className = '', ...reste }: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...reste} className={`champ ${className}`} />;
+}
+
+type PropsSaisieLibre = {
+  /** Texte affiché au premier rendu, tel quel. */
+  valeurInitiale: string;
+  onTexte: (texte: string) => void;
+} & Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'defaultValue' | 'onChange'>;
+
+/**
+ * Saisie de texte NON CONTRÔLÉE, qui ne réécrit jamais ce que l'utilisateur tape.
+ *
+ * Ce n'est pas un détail de style, et c'est la raison d'être de ce composant : un champ
+ * contrôlé qui reformate sa valeur à chaque frappe se réécrit sous le doigt. Le curseur
+ * repart à la fin et le texte tapé est remplacé par sa version formatée. Deux symptômes
+ * relevés sur un téléphone viennent de là, tous deux invisibles au clavier d'un ordinateur :
+ *
+ *   - le champ affiche « 0,00 » ; taper 7 place le curseur après la virgule, ce qui donne
+ *     « 0,007 », soit 0,7 centime arrondi à 1 centime — le montant semble ne pas bouger ;
+ *   - effacer un caractère de « 0,01 » donne « 0,0 », aussitôt réécrit « 0,00 » : la
+ *     suppression semble sans effet.
+ *
+ * On garde donc le texte tel que l'utilisateur le tape, et on ne remonte que la valeur
+ * analysée, par `onTexte`. Une saisie illisible — « 1,2,3 », une lettre — n'est jamais
+ * effacée sous les yeux de l'utilisateur : elle reste à l'écran, et c'est à lui de la
+ * corriger. La remplacer par l'ancienne valeur lui ferait croire que rien ne s'est passé.
+ *
+ * Le contenu est sélectionné au focus, pour qu'une valeur DÉJÀ saisie se remplace d'un
+ * seul geste : « j'appuie et je tape ».
+ *
+ * La clé React doit rester stable pendant la frappe : remonter le champ ferait perdre le
+ * focus et refermerait le clavier. Pour réamorcer le texte depuis la valeur — changement
+ * de ligne, de mode HT/TTC —, c'est l'appelant qui change la clé.
+ */
+export function SaisieLibre({ valeurInitiale, onTexte, ...reste }: PropsSaisieLibre) {
+  return (
+    <Saisie
+      defaultValue={valeurInitiale}
+      onFocus={(evenement) => evenement.currentTarget.select()}
+      onChange={(evenement) => onTexte(evenement.target.value)}
+      {...reste}
+    />
+  );
+}
+
+type PropsSaisieEuros = {
+  /** Montant courant, en centimes entiers. */
+  centimes: number;
+  onCentimes: (centimes: number) => void;
+} & Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'defaultValue' | 'onChange'>;
+
+/**
+ * Saisie d'un montant en euros, appuyée sur `SaisieLibre` — lire son commentaire pour la
+ * raison d'être du champ non contrôlé.
+ *
+ * Une seule précaution est propre au montant : un montant NUL s'affiche VIDE plutôt que
+ * « 0,00 ». Un champ prérempli de zéros oblige à effacer avant de saisir, et c'est cette
+ * obligation qui produisait le premier symptôme relevé sur le téléphone.
+ */
+export function SaisieEuros({ centimes, onCentimes, ...reste }: PropsSaisieEuros) {
+  return (
+    <SaisieLibre
+      inputMode="decimal"
+      valeurInitiale={centimes === 0 ? '' : formatSaisieEuros(centimes)}
+      onTexte={(texte) => {
+        const saisis = parseSaisieEuros(texte);
+        if (saisis === null) return;
+        onCentimes(saisis);
+      }}
+      {...reste}
+    />
+  );
 }
 
 export function ZoneTexte({

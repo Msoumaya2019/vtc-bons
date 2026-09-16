@@ -472,3 +472,65 @@ describe('aide à la saisie d’adresse', () => {
     );
   });
 });
+
+describe('saisie des montants', () => {
+  /**
+   * Les champs de montant étaient CONTRÔLÉS : leur valeur était réécrite à chaque frappe.
+   * Sur un téléphone, le curseur repartait à la fin et le texte tapé était remplacé par sa
+   * version formatée — taper 7 après « 0,00 » donnait « 0,007 », soit un centime, et
+   * effacer semblait sans effet. Invisible au clavier d'un ordinateur.
+   *
+   * Ces tests mesurent le COMPORTEMENT DU CHAMP, pas le calcul : ils vérifient que ce qui
+   * est tapé reste à l'écran.
+   */
+
+  /** Ouvre l'assistant de création et avance jusqu'à l'étape « Prestation et prix ». */
+  async function ouvrirLesPrestations() {
+    await saveSettings(reglagesTest());
+    render(<App />);
+    await attendreDemarrage();
+
+    // L'assistant n'oppose aucune validation au passage d'étape : deux appuis suffisent.
+    fireEvent.click(await screen.findByRole('button', { name: 'Continuer' }, { timeout: DELAI }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continuer' }));
+  }
+
+  it('ne réécrit pas le prix unitaire sous les doigts du chauffeur', async () => {
+    await ouvrirLesPrestations();
+
+    const prix = screen.getByLabelText('Prix unitaire TTC') as HTMLInputElement;
+
+    // Une ligne neuve vaut zéro, donc le champ doit être VIDE. Un « 0,00 » affiché
+    // obligerait à effacer avant de saisir, et c'est cette obligation qui faisait qu'un
+    // chiffre tapé après la virgule ne changeait rien.
+    expect(prix.value).toBe('');
+
+    fireEvent.change(prix, { target: { value: '9' } });
+    expect(prix.value).toBe('9');
+
+    fireEvent.change(prix, { target: { value: '95' } });
+    expect(prix.value).toBe('95');
+  });
+
+  it('accepte une remise en pourcentage écrite avec une virgule', async () => {
+    // Un clavier de téléphone propose la virgule comme séparateur décimal. Sans
+    // normalisation, « 1,5 » vaut NaN et la remise retombait silencieusement à zéro :
+    // le chauffeur annonçait une remise que le bon n'appliquait pas.
+    await ouvrirLesPrestations();
+
+    // 110 € TTC à 10 % de TVA, soit 100 € HT : la remise doit se voir dans le total.
+    fireEvent.change(screen.getByLabelText('Prix unitaire TTC'), { target: { value: '110' } });
+
+    fireEvent.change(screen.getByLabelText('Type de remise'), {
+      target: { value: 'pourcentage' },
+    });
+    const remise = screen.getByLabelText('Remise (%)') as HTMLInputElement;
+
+    fireEvent.change(remise, { target: { value: '1,5' } });
+
+    expect(remise.value).toBe('1,5');
+    // 1,5 % de 100 € : 98,50 € HT, et non 100 €. On vise la ligne « Total HT » : le
+    // montant apparaît aussi dans le détail de TVA, où il désigne la base taxable.
+    expect(screen.getByText('Total HT').closest('div')).toHaveTextContent('98,50 €');
+  });
+});

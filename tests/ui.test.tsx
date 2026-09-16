@@ -11,7 +11,7 @@ import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { Modale, DialogueConfirmation } from '../src/components/ui/Modale';
-import { Bascule, CaseACocher, Champ, Saisie } from '../src/components/ui/Champ';
+import { Bascule, CaseACocher, Champ, Saisie, SaisieEuros, SaisieLibre } from '../src/components/ui/Champ';
 import { Bouton } from '../src/components/ui/Bouton';
 
 describe('Modale', () => {
@@ -206,6 +206,113 @@ describe('Champ', () => {
     );
 
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
+describe('SaisieEuros', () => {
+  /**
+   * Champ monté sur un état : on observe à la fois ce qui RESTE à l'écran et ce qui est
+   * REMONTÉ. Les deux comptent, et c'est leur écart qui décrit le défaut relevé sur un
+   * téléphone — un champ qui se réécrit affiche une chose et en enregistre une autre.
+   */
+  function Harnais({ depart = 0 }: { depart?: number }) {
+    const [centimes, setCentimes] = useState(depart);
+    return (
+      <>
+        <Champ label="Montant">
+          {(id) => <SaisieEuros id={id} centimes={centimes} onCentimes={setCentimes} />}
+        </Champ>
+        <p data-testid="remonte">{centimes}</p>
+      </>
+    );
+  }
+
+  it('laisse le champ vide quand le montant est nul', () => {
+    // Un champ prérempli « 0,00 » oblige à effacer avant de saisir : c'est cette
+    // obligation qui faisait qu'un chiffre tapé après la virgule ne changeait rien.
+    render(<Harnais />);
+
+    expect(screen.getByLabelText('Montant')).toHaveValue('');
+  });
+
+  it('n’efface pas un zéro en cours de frappe', () => {
+    render(<Harnais />);
+    const champ = screen.getByLabelText('Montant') as HTMLInputElement;
+
+    fireEvent.change(champ, { target: { value: '0,0' } });
+
+    expect(champ.value).toBe('0,0');
+  });
+
+  it('laisse le montant se former chiffre après chiffre', () => {
+    render(<Harnais />);
+    const champ = screen.getByLabelText('Montant') as HTMLInputElement;
+
+    fireEvent.change(champ, { target: { value: '9' } });
+    expect(champ.value).toBe('9');
+    expect(screen.getByTestId('remonte')).toHaveTextContent('900');
+
+    fireEvent.change(champ, { target: { value: '95' } });
+    expect(champ.value).toBe('95');
+    expect(screen.getByTestId('remonte')).toHaveTextContent('9500');
+  });
+
+  it('garde à l’écran une saisie illisible, sans la remplacer', () => {
+    // Remplacer la saisie par l'ancienne valeur ferait croire à l'utilisateur que rien
+    // ne s'est passé. Elle reste à l'écran, à lui de la corriger.
+    render(<Harnais depart={9500} />);
+    const champ = screen.getByLabelText('Montant') as HTMLInputElement;
+
+    fireEvent.change(champ, { target: { value: '1,2,3' } });
+
+    expect(champ.value).toBe('1,2,3');
+    expect(screen.getByTestId('remonte')).toHaveTextContent('9500');
+  });
+
+  it('sélectionne le contenu au focus, pour remplacer d’un seul geste', () => {
+    render(<Harnais depart={9500} />);
+    const champ = screen.getByLabelText('Montant') as HTMLInputElement;
+    expect(champ.value).toBe('95,00');
+
+    fireEvent.focus(champ);
+
+    expect(champ.selectionStart).toBe(0);
+    expect(champ.selectionEnd).toBe(5);
+  });
+});
+
+describe('SaisieLibre', () => {
+  it('remonte le texte tel qu’il est tapé, sans le réécrire', () => {
+    // C'est le socle du champ non contrôlé : ce qui est tapé reste à l'écran, et c'est
+    // l'appelant qui décide de ce qu'il en fait.
+    const onTexte = vi.fn();
+    render(
+      <Champ label="Remise">
+        {(id) => <SaisieLibre id={id} valeurInitiale="" onTexte={onTexte} />}
+      </Champ>,
+    );
+    const champ = screen.getByLabelText('Remise') as HTMLInputElement;
+
+    fireEvent.change(champ, { target: { value: '1,5' } });
+
+    expect(champ.value).toBe('1,5');
+    expect(onTexte).toHaveBeenCalledWith('1,5');
+  });
+
+  it('garde à l’écran ce que l’appelant refuse de prendre', () => {
+    // Le champ ne connaît pas la règle de l'appelant, et il ne doit pas l'inventer :
+    // un refus silencieux accompagné d'une réécriture donnerait le sentiment que la
+    // frappe n'a pas été prise en compte, alors qu'elle l'a été.
+    render(
+      <Champ label="Remise">
+        {(id) => <SaisieLibre id={id} valeurInitiale="10" onTexte={() => {}} />}
+      </Champ>,
+    );
+    const champ = screen.getByLabelText('Remise') as HTMLInputElement;
+
+    fireEvent.change(champ, { target: { value: '10abc' } });
+
+    expect(champ.value).toBe('10abc');
   });
 });
 

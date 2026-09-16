@@ -4,12 +4,19 @@ import { useReglages } from '../../context/ReglagesContext';
 import { useToast } from '../../components/ui/Toast';
 import { Badge, Carte, EtatVide } from '../../components/ui/Carte';
 import { Bouton } from '../../components/ui/Bouton';
-import { Bascule, CaseACocher, Champ, Liste, Saisie, ZoneTexte } from '../../components/ui/Champ';
+import {
+  Bascule,
+  CaseACocher,
+  Champ,
+  Liste,
+  Saisie,
+  SaisieEuros,
+  ZoneTexte,
+} from '../../components/ui/Champ';
 import { ChampAdresse } from '../../components/ui/ChampAdresse';
 import { DialogueConfirmation, Modale } from '../../components/ui/Modale';
 import { IconeClients, IconePlus, IconePoubelle, IconeRecherche } from '../../components/icons';
 import { adresseSurUneLigne, clientVide } from '../../lib/snapshots';
-import { formatSaisieEuros, parseSaisieEuros } from '../../lib/money';
 import { validerEmail, validerSiret, validerTelephone, validerTvaIntracom } from '../../lib/validation';
 import { libelleModePaiement, libelleTypeClient, libelleTypePrestation } from '../../lib/format';
 import type {
@@ -438,15 +445,10 @@ export function PageClients() {
                     obligatoire
                   >
                     {(id) => (
-                      <Saisie
+                      <SaisieEuros
                         id={id}
-                        inputMode="decimal"
-                        value={formatSaisieEuros(enEdition.instantane.prixTTCcentimes)}
-                        onChange={(evenement) => {
-                          const centimes = parseSaisieEuros(evenement.target.value);
-                          if (centimes === null) return;
-                          majInstantane('prixTTCcentimes', centimes);
-                        }}
+                        centimes={enEdition.instantane.prixTTCcentimes}
+                        onCentimes={(centimes) => majInstantane('prixTTCcentimes', centimes)}
                       />
                     )}
                   </Champ>

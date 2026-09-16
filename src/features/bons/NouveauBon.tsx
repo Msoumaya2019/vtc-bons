@@ -5,13 +5,21 @@ import { useClients } from '../../context/ClientsContext';
 import { useToast } from '../../components/ui/Toast';
 import { Badge, Bandeau, BarreProgression, Carte } from '../../components/ui/Carte';
 import { Bouton } from '../../components/ui/Bouton';
-import { CaseACocher, Champ, Liste, Saisie, ZoneTexte } from '../../components/ui/Champ';
+import {
+  CaseACocher,
+  Champ,
+  Liste,
+  Saisie,
+  SaisieEuros,
+  SaisieLibre,
+  ZoneTexte,
+} from '../../components/ui/Champ';
 import { ChampAdresse } from '../../components/ui/ChampAdresse';
 import { IconeAlerte, IconeCheck, IconePlus, IconePoubelle } from '../../components/icons';
 import { bonVide, emettreBon, enregistrerBrouillon, ErreurConformite, ligneVide } from './service';
 import { blocages, avertissements, verifierConformiteBon } from './conformite';
 import { calculerTotaux, TAUX_PROPOSES, htDepuisTTC } from '../../lib/tva';
-import { formatEuros, formatSaisieEuros, parseSaisieEuros } from '../../lib/money';
+import { formatEuros } from '../../lib/money';
 import { formatDate, libelleTypePrestation } from '../../lib/format';
 import { calculerDistance, geocoderAdresse } from '../../lib/geo';
 import type { Adresse } from '../../lib/geo';
@@ -554,9 +562,6 @@ export function NouveauBon() {
               const unitaireTTC = Math.round(
                 ligne.prixUnitaireCentimes * (1 + ligne.tauxTVA / 100),
               );
-              const prixAffiche = formatSaisieEuros(
-                saisieTTC ? unitaireTTC : ligne.prixUnitaireCentimes,
-              );
               return (
                 <div
                   key={ligne.id}
@@ -588,22 +593,21 @@ export function NouveauBon() {
                     </Champ>
                     <Champ label={saisieTTC ? 'Prix unitaire TTC' : 'Prix unitaire HT'}>
                       {(id) => (
-                        <Saisie
+                        <SaisieEuros
                           id={id}
-                          inputMode="decimal"
-                          defaultValue={prixAffiche}
-                          /* La clé ne dépend que de la ligne et du mode de saisie : le champ
-                             n'est jamais remonté pendant la frappe, ce qui évite de perdre le
-                             focus et permet de taper une virgule décimale. */
-                          key={`${ligne.id}-${saisieTTC}`}
-                          onChange={(evenement) => {
-                            const centimes = parseSaisieEuros(evenement.target.value);
-                            if (centimes === null) return;
+                          centimes={saisieTTC ? unitaireTTC : ligne.prixUnitaireCentimes}
+                          onCentimes={(centimes) => {
                             const ht = saisieTTC
                               ? htDepuisTTC(centimes, ligne.tauxTVA).ht
                               : centimes;
                             majLigne(ligne.id, { prixUnitaireCentimes: ht });
                           }}
+                          /* La clé ne dépend que de la ligne et du mode de saisie : le champ
+                             n'est jamais remonté pendant la frappe, ce qui évite de perdre le
+                             focus et permet de taper une virgule décimale. Elle change en
+                             revanche au changement de mode, pour que le texte affiché — HT ou
+                             TTC — soit réamorcé depuis la valeur, et non conservé tel quel. */
+                          key={`${ligne.id}-${saisieTTC}`}
                         />
                       )}
                     </Champ>
@@ -696,26 +700,38 @@ export function NouveauBon() {
                 <Champ
                   label={remise.type === 'pourcentage' ? 'Remise (%)' : 'Remise (€)'}
                 >
-                  {(id) => (
-                    <Saisie
-                      id={id}
-                      inputMode="decimal"
-                      value={
-                        remise.type === 'pourcentage'
-                          ? String(remise.valeur)
-                          : formatSaisieEuros(remise.valeur)
-                      }
-                      onChange={(evenement) => {
-                        const brut = evenement.target.value;
-                        if (remise.type === 'pourcentage') {
-                          maj('remiseGlobale', { type: 'pourcentage', valeur: Number(brut) || 0 });
-                        } else {
-                          const centimes = parseSaisieEuros(brut);
-                          maj('remiseGlobale', { type: 'montant', valeur: centimes ?? 0 });
+                  {(id) => {
+                    // Les deux natures de remise n'ont pas le même champ : un montant se
+                    // saisit comme un montant, un pourcentage comme un nombre. Les rendre
+                    // par deux composants distincts fait aussi remonter le champ au
+                    // changement de type — React démonte et remonte, puisque le type
+                    // d'élément change —, ce qui réamorce un texte qui ne veut plus dire
+                    // la même chose.
+                    return remise.type === 'pourcentage' ? (
+                      <SaisieLibre
+                        id={id}
+                        inputMode="decimal"
+                        valeurInitiale={remise.valeur === 0 ? '' : String(remise.valeur)}
+                        onTexte={(brut) => {
+                          // Un clavier de téléphone propose la virgule : sans cette
+                          // normalisation, « 1,5 » vaut NaN et la remise retombe à zéro.
+                          const valeur = Number(brut.replace(',', '.'));
+                          maj('remiseGlobale', {
+                            type: 'pourcentage',
+                            valeur: Number.isFinite(valeur) ? valeur : 0,
+                          });
+                        }}
+                      />
+                    ) : (
+                      <SaisieEuros
+                        id={id}
+                        centimes={remise.valeur}
+                        onCentimes={(centimes) =>
+                          maj('remiseGlobale', { type: 'montant', valeur: centimes })
                         }
-                      }}
-                    />
-                  )}
+                      />
+                    );
+                  }}
                 </Champ>
               ) : null}
             </div>
