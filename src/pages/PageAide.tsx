@@ -115,8 +115,12 @@ export function PageAide() {
         <p className="text-sm text-slate-600 dark:text-slate-300">
           Cette application ne dispose d’aucun serveur. Vos réglages, vos clients, vos bons, vos
           factures et vos PDF restent <strong>sur cet appareil</strong>, dans le stockage local du
-          navigateur. Aucune donnée n’est transmise, aucun compte n’est créé, aucune statistique
-          n’est collectée, et l’application fonctionne en mode avion.
+          navigateur. Aucun compte n’est créé, aucune statistique n’est collectée, aucun document
+          n’est transmis, et l’application fonctionne en mode avion.
+        </p>
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          Une seule chose peut sortir de l’appareil : le texte des champs d’adresse, et seulement
+          si l’aide à la saisie d’adresse est active. Le détail est dans la rubrique suivante.
         </p>
         <p className="text-sm text-slate-600 dark:text-slate-300">
           La contrepartie est nette : <strong>une sauvegarde régulière est indispensable</strong>.
@@ -127,6 +131,37 @@ export function PageAide() {
           Les pièces comptables se conservent <strong>10 ans</strong>. L’application ne supprime
           donc jamais automatiquement un bon ou une facture : la suppression les place en
           corbeille, où ils restent restaurables.
+        </p>
+      </Carte>
+
+      <Carte className="space-y-2">
+        <h2 className="section-titre">L’aide à la saisie d’adresse</h2>
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          Trois aides, sur les champs de prise en charge et de destination :
+        </p>
+        <ul className="list-inside list-disc space-y-1 text-sm text-slate-700 dark:text-slate-200">
+          <li>des propositions d’adresses au fil de la frappe, à partir de quatre caractères ;</li>
+          <li>
+            un bouton <strong>« Ma position »</strong> sur le lieu de prise en charge, qui remplit
+            l’adresse sans que vous ayez à la taper ;
+          </li>
+          <li>le calcul de la distance et de la durée du trajet, par la route.</li>
+        </ul>
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          <strong>Ce qui est transmis :</strong> le texte tapé dans le champ, ou vos coordonnées
+          lorsque vous appuyez sur « Ma position ». Rien de plus. Ni les noms de vos clients, ni
+          les prix, ni vos documents, ni votre identité. Les services utilisés — Photon pour les
+          adresses, OSRM pour les distances — sont ouverts, gratuits, sans compte ni clé, et
+          hébergés en Allemagne par des associations.
+        </p>
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          <strong>Pour tout couper :</strong>{' '}
+          <Link to="/reglages" className="lien-accent">
+            Réglages
+          </Link>{' '}
+          → « Aide à la saisie d’adresse ». Le champ redevient alors une simple saisie : vous
+          écrivez l’adresse et la distance à la main, comme avant. Sans connexion, l’aide est
+          simplement indisponible — l’application ne bloque jamais et n’affiche aucune erreur.
         </p>
       </Carte>
 

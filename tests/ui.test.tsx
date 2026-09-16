@@ -7,6 +7,7 @@
  * un traitement.
  */
 
+import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { Modale, DialogueConfirmation } from '../src/components/ui/Modale';
@@ -69,6 +70,36 @@ describe('Modale', () => {
     unmount();
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onFermer).not.toHaveBeenCalled();
+  });
+
+  it('ne reprend pas le focus quand le parent se rend à nouveau', () => {
+    // Reproduit exactement le cas réel : le parent recrée `onFermer` à chaque frappe,
+    // puisque la fonction dépend de son propre état. Si l'effet de la modale dépendait
+    // de cette fonction, il se relançait à chaque lettre et replaçait le focus sur la
+    // modale — sur iPhone, le clavier se refermait aussitôt.
+    function Formulaire() {
+      const [valeur, setValeur] = useState('');
+      return (
+        <Modale ouverte titre="Fiche client" onFermer={() => {}}>
+          <Saisie
+            aria-label="Nom"
+            value={valeur}
+            onChange={(evenement) => setValeur(evenement.target.value)}
+          />
+        </Modale>
+      );
+    }
+
+    render(<Formulaire />);
+
+    const champ = screen.getByLabelText('Nom');
+    champ.focus();
+    expect(champ).toHaveFocus();
+
+    fireEvent.change(champ, { target: { value: 'Dupont' } });
+
+    expect(champ).toHaveFocus();
+    expect(champ).toHaveValue('Dupont');
   });
 });
 

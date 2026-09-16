@@ -60,6 +60,42 @@ jobs:
           npx cap add android
           npx cap sync android
 
+      - name: Déclarer l'accès à la position
+        # Le manifeste du greffon de géolocalisation est VIDE : contrairement à la
+        # permission INTERNET, qui vient de la bibliothèque Capacitor, les
+        # permissions de localisation doivent être écrites dans le manifeste de
+        # l'application. Sans elles, Android refuse la demande sans même afficher
+        # de dialogue, et le bouton « Ma position » échoue.
+        #
+        # `android/` étant régénéré à chaque compilation, cette écriture se fait ici :
+        # c'est le seul endroit qui survive à la régénération.
+        run: |
+          MANIFESTE=android/app/src/main/AndroidManifest.xml
+          if [ ! -f "$MANIFESTE" ]; then
+            echo "::error::AndroidManifest.xml introuvable : le projet Android n'a pas été généré."
+            exit 1
+          fi
+
+          sed -i 's|^    <application$|    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n\n    <application|' "$MANIFESTE"
+
+          # Vérification : la substitution ci-dessus s'ancre sur l'indentation du
+          # modèle de Capacitor. Si ce modèle change, elle ne ferait plus rien — et
+          # l'application perdrait la position sans que rien ne le signale. On
+          # s'arrête donc ici plutôt que de livrer un APK amputé.
+          for PERMISSION in ACCESS_COARSE_LOCATION ACCESS_FINE_LOCATION; do
+            if ! grep -q "$PERMISSION" "$MANIFESTE"; then
+              echo "::error::$PERMISSION n'a pas pu être écrite dans le manifeste."
+              exit 1
+            fi
+          done
+
+          # Contrôle final : le manifeste doit rester un XML valide. Un fichier
+          # cassé ne se verrait qu'à la compilation Gradle, plus loin et moins
+          # lisiblement.
+          python3 -c "import xml.dom.minidom, sys; xml.dom.minidom.parse(sys.argv[1])" "$MANIFESTE"
+
+          sed -n '1,10p' "$MANIFESTE"
+
       - name: APK de test
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon --stacktrace

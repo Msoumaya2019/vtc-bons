@@ -105,6 +105,10 @@ export function parametresParDefaut(): Settings {
     signature: '',
     couleurAccent: '#1d4ed8',
 
+    // Activé par défaut : c'est ce qui rend la saisie d'adresse confortable. Le
+    // chauffeur peut le couper, et plus rien ne sort alors de l'appareil.
+    aideAdresse: true,
+
     derniereSauvegarde: null,
   };
 }

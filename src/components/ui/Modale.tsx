@@ -14,15 +14,25 @@ interface PropsModale {
 export function Modale({ ouverte, titre, onFermer, children, actions }: PropsModale) {
   const reference = useRef<HTMLDivElement>(null);
 
+  // `onFermer` change d'identité à chaque rendu du parent — et le parent en recrée
+  // une à chaque frappe, puisqu'il met à jour son état. La garder dans une référence
+  // évite d'en dépendre : sans cela, l'effet ci-dessous se relançait à chaque lettre
+  // tapée et reprenait le focus pour le donner à la modale, ce qui refermait le
+  // clavier de l'iPhone aussitôt.
+  const fermer = useRef(onFermer);
+  useEffect(() => {
+    fermer.current = onFermer;
+  }, [onFermer]);
+
   useEffect(() => {
     if (!ouverte) return;
     const surTouche = (evenement: KeyboardEvent) => {
-      if (evenement.key === 'Escape') onFermer();
+      if (evenement.key === 'Escape') fermer.current();
     };
     document.addEventListener('keydown', surTouche);
     reference.current?.focus();
     return () => document.removeEventListener('keydown', surTouche);
-  }, [ouverte, onFermer]);
+  }, [ouverte]);
 
   if (!ouverte) return null;
 

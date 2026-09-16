@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useReglages } from '../../context/ReglagesContext';
 import { useClients } from '../../context/ClientsContext';
@@ -6,12 +6,15 @@ import { useToast } from '../../components/ui/Toast';
 import { Badge, Bandeau, BarreProgression, Carte } from '../../components/ui/Carte';
 import { Bouton } from '../../components/ui/Bouton';
 import { CaseACocher, Champ, Liste, Saisie, ZoneTexte } from '../../components/ui/Champ';
+import { ChampAdresse } from '../../components/ui/ChampAdresse';
 import { IconeAlerte, IconeCheck, IconePlus, IconePoubelle } from '../../components/icons';
 import { bonVide, emettreBon, enregistrerBrouillon, ErreurConformite, ligneVide } from './service';
 import { blocages, avertissements, verifierConformiteBon } from './conformite';
 import { calculerTotaux, TAUX_PROPOSES, htDepuisTTC } from '../../lib/tva';
 import { formatEuros, formatSaisieEuros, parseSaisieEuros } from '../../lib/money';
 import { formatDate, libelleTypePrestation } from '../../lib/format';
+import { calculerDistance, geocoderAdresse } from '../../lib/geo';
+import type { Adresse } from '../../lib/geo';
 import type { Bon, LignePrestation, ModePaiement, RemiseGlobale, TypePrestation } from '../../types';
 
 const ETAPES = ['Client et créneau', 'Trajet', 'Prestation et prix', 'Récapitulatif'];
@@ -29,6 +32,27 @@ export function NouveauBon() {
   const [corrigerReservation, setCorrigerReservation] = useState(false);
   const [enCours, setEnCours] = useState(false);
   const [erreurEmission, setErreurEmission] = useState<string[]>([]);
+
+  // Coordonnées retenues pour les deux adresses du trajet. Elles ne sont pas
+  // enregistrées avec le bon : seule la distance l'est. Elles servent au calcul,
+  // puis disparaissent avec l'écran.
+  const [coordonneesDepart, setCoordonneesDepart] = useState<Adresse | null>(null);
+  const [coordonneesArrivee, setCoordonneesArrivee] = useState<Adresse | null>(null);
+  const [distanceEnCours, setDistanceEnCours] = useState(false);
+  const [messageDistance, setMessageDistance] = useState<string | null>(null);
+
+  /**
+   * Retient si la distance affichée vient du calcul ou de la main du chauffeur.
+   *
+   * La distinction compte au moment de l'invalidation : une distance calculée ne décrit
+   * plus rien dès qu'une adresse est retouchée, et doit donc disparaître. Une distance
+   * saisie à la main, elle, n'appartenait pas au calcul — l'effacer reviendrait à
+   * détruire une saisie.
+   *
+   * Un `ref` et non un état : un état placé dans les dépendances de l'effet ci-dessous
+   * relancerait le calcul au moment même où il vient de réussir.
+   */
+  const distanceCalculee = useRef(false);
 
   const clientSelectionne = useMemo(
     () => clients.find((client) => client.id === bon.clientId) ?? null,
@@ -52,10 +76,70 @@ export function NouveauBon() {
   const bloquants = blocages(problemes);
   const avis = avertissements(problemes);
 
+  // Distance routière réelle, recalculée dès que les deux adresses sont connues.
+  // Déclaré avant la sortie anticipée ci-dessous : un effet ne peut pas être appelé
+  // sous condition, sous peine de casser l'ordre des crochets d'un rendu à l'autre.
+  useEffect(() => {
+    // Aide coupée, ou une des deux adresses retouchée à la main : ce qui est affiché ne
+    // décrit plus le trajet. On efface le message — et la distance, si elle provenait du
+    // calcul — plutôt que de laisser sur le bon un chiffre qui ne correspond à rien.
+    if (!settings?.aideAdresse || !coordonneesDepart || !coordonneesArrivee) {
+      setMessageDistance(null);
+      if (distanceCalculee.current) {
+        distanceCalculee.current = false;
+        setBon((precedent) => ({ ...precedent, distanceKm: null }));
+      }
+      return;
+    }
+
+    const controleur = new AbortController();
+    setDistanceEnCours(true);
+    setMessageDistance(null);
+
+    void calculerDistance(coordonneesDepart, coordonneesArrivee, {
+      signal: controleur.signal,
+    }).then((distance) => {
+      if (controleur.signal.aborted) return;
+      setDistanceEnCours(false);
+
+      if (!distance) {
+        setMessageDistance('Distance indisponible. Saisissez-la à la main.');
+        return;
+      }
+      distanceCalculee.current = true;
+      setBon((precedent) => ({ ...precedent, distanceKm: distance.km }));
+      setMessageDistance(`≈ ${String(distance.minutes)} min par la route.`);
+    });
+
+    return () => controleur.abort();
+  }, [coordonneesDepart, coordonneesArrivee, settings?.aideAdresse]);
+
   if (!settings) return null;
 
   const maj = <C extends keyof Bon>(champ: C, valeur: Bon[C]) => {
     setBon((precedent) => ({ ...precedent, [champ]: valeur }));
+  };
+
+  /**
+   * Résout les adresses écrites à la main, pour les cas où le chauffeur n'a rien
+   * retenu dans les propositions. Poser les coordonnées déclenche le calcul par
+   * l'effet ci-dessus, qui se charge d'éteindre l'indicateur.
+   */
+  const resoudreAdresses = async () => {
+    setDistanceEnCours(true);
+    setMessageDistance(null);
+
+    const depart = coordonneesDepart ?? (await geocoderAdresse(bon.lieuPriseEnCharge));
+    const arrivee = coordonneesArrivee ?? (await geocoderAdresse(bon.destination));
+
+    if (!depart || !arrivee) {
+      setDistanceEnCours(false);
+      setMessageDistance('Adresse introuvable. Précisez-la, ou saisissez la distance à la main.');
+      return;
+    }
+
+    setCoordonneesDepart(depart);
+    setCoordonneesArrivee(arrivee);
   };
 
   const majLigne = (id: string, champs: Partial<LignePrestation>) => {
@@ -253,42 +337,52 @@ export function NouveauBon() {
         <div className="space-y-4">
           <Carte className="space-y-3">
             <h2 className="section-titre">Trajet</h2>
-            <Champ
+            <ChampAdresse
               label="Lieu de prise en charge"
               obligatoire
               mentionReglementaire
               aide="Adresse indiquée par le client. C’est la mention 7 du justificatif, celle qu’un agent vérifiera en premier."
-            >
-              {(id) => (
-                <Saisie
-                  id={id}
-                  value={bon.lieuPriseEnCharge}
-                  onChange={(evenement) => maj('lieuPriseEnCharge', evenement.target.value)}
-                  placeholder="Ex. 12 rue de la Gare, 95300 Pontoise"
-                />
-              )}
-            </Champ>
-            <Champ label="Destination" aide="Non exigée par l’arrêté, mais utile en cas de litige.">
-              {(id) => (
-                <Saisie
-                  id={id}
-                  value={bon.destination}
-                  onChange={(evenement) => maj('destination', evenement.target.value)}
-                  placeholder="Ex. Aéroport Charles-de-Gaulle, terminal 2E"
-                />
-              )}
-            </Champ>
+              valeur={bon.lieuPriseEnCharge}
+              onChange={(valeur) => maj('lieuPriseEnCharge', valeur)}
+              onCoordonnees={setCoordonneesDepart}
+              aideActive={settings.aideAdresse}
+              positionProposee
+              placeholder="Ex. 12 rue de la Gare, 95300 Pontoise"
+            />
+            <ChampAdresse
+              label="Destination"
+              aide="Non exigée par l’arrêté, mais utile en cas de litige."
+              valeur={bon.destination}
+              onChange={(valeur) => maj('destination', valeur)}
+              onCoordonnees={setCoordonneesArrivee}
+              aideActive={settings.aideAdresse}
+              placeholder="Ex. Aéroport Charles-de-Gaulle, terminal 2E"
+            />
             <div className="grid grid-cols-2 gap-3">
-              <Champ label="Distance estimée (km)">
+              <Champ
+                label="Distance estimée (km)"
+                aide={
+                  distanceEnCours
+                    ? 'Calcul de la distance en cours…'
+                    : (messageDistance ??
+                      'Calculée automatiquement dès que les deux adresses sont connues.')
+                }
+              >
                 {(id) => (
                   <Saisie
                     id={id}
                     type="number"
                     step="0.1"
                     value={bon.distanceKm ?? ''}
-                    onChange={(evenement) =>
-                      maj('distanceKm', evenement.target.value === '' ? null : Number(evenement.target.value))
-                    }
+                    onChange={(evenement) => {
+                      // Distance tapée à la main : elle ne vient plus du calcul, donc
+                      // elle ne doit plus être effacée avec lui.
+                      distanceCalculee.current = false;
+                      maj(
+                        'distanceKm',
+                        evenement.target.value === '' ? null : Number(evenement.target.value),
+                      );
+                    }}
                   />
                 )}
               </Champ>
@@ -309,6 +403,18 @@ export function NouveauBon() {
                 )}
               </Champ>
             </div>
+            {settings.aideAdresse &&
+            !distanceEnCours &&
+            (!coordonneesDepart || !coordonneesArrivee) &&
+            bon.lieuPriseEnCharge.trim().length > 0 &&
+            bon.destination.trim().length > 0 ? (
+              // Cas où le chauffeur a tout écrit à la main, sans retenir de proposition :
+              // on lui laisse demander le calcul explicitement plutôt que d'interroger
+              // le service à son insu.
+              <Bouton petit variante="secondaire" onClick={() => void resoudreAdresses()}>
+                Calculer la distance
+              </Bouton>
+            ) : null}
             <button
               type="button"
               onClick={() => setPlusDOptions((valeur) => !valeur)}

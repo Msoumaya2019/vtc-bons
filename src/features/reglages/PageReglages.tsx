@@ -709,6 +709,18 @@ export function PageReglages() {
         </Champ>
       </SectionRepliable>
 
+      <SectionRepliable
+        titre="Aide à la saisie d’adresse"
+        description="Propositions, position actuelle, distance"
+      >
+        <CaseACocher
+          label="Proposer des adresses et calculer la distance"
+          aide="L’application interroge alors deux services externes gratuits, sans compte ni clé : Photon (Komoot, Allemagne) pour retrouver une adresse, et OSRM (FOSSGIS, Allemagne) pour la distance routière. Seules les adresses du trajet leur sont transmises — jamais le nom de vos clients, ni vos tarifs. Désactivé, plus aucune donnée ne quitte l’appareil et toute la saisie redevient manuelle."
+          checked={brouillon.aideAdresse}
+          onChange={(valeur) => maj('aideAdresse', valeur)}
+        />
+      </SectionRepliable>
+
       <Carte>
         <ModuleDocuments />
       </Carte>

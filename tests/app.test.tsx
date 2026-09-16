@@ -8,10 +8,27 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { App } from '../src/App';
 import { db, effacerToutesLesDonnees, saveSettings } from '../src/lib/db';
 import { bonTest, reglagesTest } from './aides';
+
+/**
+ * Aide à la saisie d'adresse.
+ *
+ * Le service est remplacé ici comme dans `geo.test.ts` : sans cela, monter
+ * l'application ferait partir de vrais appels vers Photon et OSRM à chaque test.
+ */
+const geoSimule = vi.hoisted(() => ({
+  chercherAdresses: vi.fn(),
+  calculerDistance: vi.fn(),
+  geocoderAdresse: vi.fn(),
+  adresseDepuisPosition: vi.fn(),
+  positionActuelle: vi.fn(),
+  messageEchecPosition: vi.fn(() => 'Position indisponible.'),
+}));
+
+vi.mock('../src/lib/geo', () => geoSimule);
 
 /**
  * Délai d'attente des écrans.
@@ -274,5 +291,116 @@ describe('mode contrôle', () => {
     } finally {
       espion.mockRestore();
     }
+  });
+});
+
+describe('aide à la saisie d’adresse', () => {
+  /**
+   * Les valeurs attendues ici ne dépendent que d'un état React, pas d'un montage
+   * complet : un délai plus court que `DELAI` suffit. Surtout, il reste sous le délai
+   * maximal d'un test — sans quoi un échec se signalerait par un dépassement de temps,
+   * au lieu de dire quelle valeur manquait.
+   */
+  const DELAI_ETAT = 2_000;
+
+  const PONTOISE = {
+    libelle: '12 Rue de la Gare, 95300 Pontoise',
+    longitude: 2.0969,
+    latitude: 49.0512,
+  };
+
+  const ROISSY = {
+    libelle: 'Aéroport Charles-de-Gaulle, 95700 Roissy-en-France',
+    longitude: 2.55,
+    latitude: 49.0097,
+  };
+
+  beforeEach(() => {
+    geoSimule.chercherAdresses.mockImplementation((texte: string) =>
+      Promise.resolve(texte.toLowerCase().includes('pontoise') ? [PONTOISE] : [ROISSY]),
+    );
+    geoSimule.calculerDistance.mockResolvedValue({ km: 42.2, minutes: 37 });
+  });
+
+  /** Ouvre le formulaire de bon et passe à l'étape du trajet. */
+  async function ouvrirLeTrajet() {
+    await saveSettings(reglagesTest());
+    render(<App />);
+    await attendreDemarrage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Continuer' }, { timeout: DELAI }));
+  }
+
+  it('remplit le trajet depuis les propositions d’adresses', async () => {
+    await ouvrirLeTrajet();
+
+    const depart = screen.getByRole('combobox', { name: /Lieu de prise en charge/ });
+    fireEvent.change(depart, { target: { value: 'Pontoise' } });
+    fireEvent.mouseDown(await screen.findByRole('option', {}, { timeout: DELAI }));
+
+    expect(depart).toHaveValue(PONTOISE.libelle);
+  });
+
+  it('calcule la distance dès que les deux adresses sont connues', async () => {
+    await ouvrirLeTrajet();
+
+    const depart = screen.getByRole('combobox', { name: /Lieu de prise en charge/ });
+    const arrivee = screen.getByRole('combobox', { name: /Destination/ });
+
+    fireEvent.change(depart, { target: { value: 'Pontoise' } });
+    fireEvent.mouseDown(await screen.findByRole('option', {}, { timeout: DELAI }));
+
+    fireEvent.change(arrivee, { target: { value: 'Roissy' } });
+    fireEvent.mouseDown(await screen.findByRole('option', {}, { timeout: DELAI }));
+
+    await waitFor(
+      () => expect(screen.getByLabelText(/Distance estimée/)).toHaveValue(42.2),
+      { timeout: DELAI_ETAT },
+    );
+  });
+
+  it('efface la distance calculée dès qu’une adresse est retouchée', async () => {
+    // Sans cela, le bon conserverait un kilométrage qui ne correspond plus au trajet
+    // affiché — un chiffre faux, présenté comme un calcul.
+    await ouvrirLeTrajet();
+
+    const depart = screen.getByRole('combobox', { name: /Lieu de prise en charge/ });
+    const arrivee = screen.getByRole('combobox', { name: /Destination/ });
+
+    fireEvent.change(depart, { target: { value: 'Pontoise' } });
+    fireEvent.mouseDown(await screen.findByRole('option', {}, { timeout: DELAI }));
+
+    fireEvent.change(arrivee, { target: { value: 'Roissy' } });
+    fireEvent.mouseDown(await screen.findByRole('option', {}, { timeout: DELAI }));
+
+    const distance = screen.getByLabelText(/Distance estimée/);
+    await waitFor(() => expect(distance).toHaveValue(42.2), { timeout: DELAI_ETAT });
+
+    fireEvent.change(arrivee, { target: { value: 'Roissy, terminal 2E' } });
+
+    await waitFor(() => expect(distance).toHaveValue(null), { timeout: DELAI_ETAT });
+  });
+
+  it('laisse intacte une distance saisie à la main', async () => {
+    await ouvrirLeTrajet();
+
+    const depart = screen.getByRole('combobox', { name: /Lieu de prise en charge/ });
+    const arrivee = screen.getByRole('combobox', { name: /Destination/ });
+
+    fireEvent.change(depart, { target: { value: 'Pontoise' } });
+    fireEvent.mouseDown(await screen.findByRole('option', {}, { timeout: DELAI }));
+
+    fireEvent.change(arrivee, { target: { value: 'Roissy' } });
+    fireEvent.mouseDown(await screen.findByRole('option', {}, { timeout: DELAI }));
+
+    const distance = screen.getByLabelText(/Distance estimée/);
+    await waitFor(() => expect(distance).toHaveValue(42.2), { timeout: DELAI_ETAT });
+
+    // Le chauffeur corrige le kilométrage : la valeur n'est plus celle du calcul.
+    fireEvent.change(distance, { target: { value: '18' } });
+
+    // Retoucher une adresse invalide le calcul — pas la saisie du chauffeur.
+    fireEvent.change(arrivee, { target: { value: 'Roissy, terminal 2E' } });
+
+    await waitFor(() => expect(distance).toHaveValue(18), { timeout: DELAI_ETAT });
   });
 });

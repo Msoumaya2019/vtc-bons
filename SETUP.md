@@ -117,6 +117,12 @@ Ouvrez l'onglet **Réglages** et remplissez, dans l'ordre :
 5. **Numérotation** — les préfixes (`BC`, `FA`, `AV`). Laissez les valeurs par défaut
    sauf raison particulière.
 6. **Apparence** — votre logo et votre couleur, si vous en avez.
+7. **Aide à la saisie d'adresse** — laissée active par défaut. Elle propose les adresses au
+   fil de la frappe, remplit le lieu de prise en charge depuis votre position, et calcule
+   la distance et la durée du trajet par la route. C'est la **seule** fonction qui sort du
+   téléphone : elle transmet le texte des champs d'adresse à deux services ouverts, Photon
+   et OSRM. Si vous préférez que rien ne sorte, décochez-la — la saisie à la main reste
+   strictement identique.
 
 Puis ouvrez l'onglet **Clients** et enregistrez au moins votre premier client : **le
 numéro de téléphone est obligatoire**, c'est la mention 4 du justificatif.
@@ -181,6 +187,10 @@ Pour l'App Bundle destiné à Google Play, la signature est gérée par la Play 
 - **L'application ne sera pas installable par quelqu'un d'autre** avec ce procédé : eSign
   installe sur vos appareils, pas sur ceux de vos clients. Pour distribuer largement, il
   faut passer par l'App Store.
+- **L'application demandera l'accès à votre position** la première fois que vous appuyez
+  sur « Ma position ». Acceptez : refusé, le bouton ne produit rien. L'explication affichée
+  par iOS est déclarée automatiquement par la compilation — vous n'avez **rien** à
+  configurer dans Xcode, et rien à ajouter à la main dans `Info.plist`.
 
 ### Publier sur l'App Store plus tard
 
@@ -223,6 +233,10 @@ sur l'appareil. L'application vous demande une confirmation explicite.
 | L'APK refuse de s'installer | Il n'est pas signé | Signez-le (étape 6) |
 | L'IPA refuse de s'installer | L'appareil n'est pas dans le profil de provisionnement, ou le certificat a expiré | Vérifiez le profil dans eSign |
 | Les documents ont disparu après réinstallation | L'identifiant de l'application a changé, ou le stockage a été purgé | Restaurez la dernière sauvegarde ZIP |
+| Le bouton « Ma position » ne fait rien | L'accès à la position a été refusé au premier lancement | Réglages du téléphone → vtc-bons → Position → autoriser « lors de l'utilisation » |
+| Aucune adresse n'est proposée pendant la frappe | L'aide est désactivée, ou il n'y a pas de réseau | Vérifiez Réglages → « Aide à la saisie d'adresse ». Sans réseau, écrivez l'adresse à la main : la saisie fonctionne toujours |
+| La distance ne se calcule pas | L'adresse a été tapée à la main, sans passer par une proposition | Appuyez sur **Calculer la distance** sous le champ, ou saisissez-la vous-même |
+| La compilation échoue à « Déclarer l'usage de la position » | Le modèle de projet de Capacitor a changé | Le message indique la clé ou la permission manquante : la déclaration doit être réinjectée, puisque `ios/` et `android/` sont régénérés |
 
 ---
 

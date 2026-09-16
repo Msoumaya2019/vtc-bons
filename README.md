@@ -2,8 +2,9 @@
 
 Bons de commande et factures pour chauffeur VTC.
 
-L'application tourne **entièrement sur le téléphone** : pas de compte, pas de serveur, pas
-de connexion Internet. Elle fonctionne en mode avion, y compris lors d'un contrôle.
+L'application tourne **entièrement sur le téléphone** : pas de compte, pas de serveur. Elle
+fonctionne en mode avion, y compris lors d'un contrôle. Le seul appel extérieur possible est
+l'aide à la saisie d'adresse — facultative, et désactivable dans les Réglages.
 
 ---
 
@@ -23,6 +24,14 @@ C'est l'écran à montrer à un agent.
 
 **Vos clients enregistrés.** Vous saisissez vos coordonnées une fois. Vous enregistrez
 deux ou trois clients habituels, et vous n'avez plus à les ressaisir.
+
+**L'adresse assistée.** Vous tapez les premières lettres du lieu de prise en charge : les
+propositions s'affichent, comme sur une carte. Un bouton **« Ma position »** remplit
+l'adresse de départ sans que vous ayez à la saisir. La distance et la durée du trajet se
+calculent alors toutes seules, par la route.
+
+Cette aide est facultative. Désactivée, ou sans connexion, le champ redevient une simple
+saisie et la distance se renseigne à la main.
 
 ---
 
@@ -93,8 +102,28 @@ Ces formats ne sont pas implémentés dans cette version.
 ## Où sont vos données
 
 **Sur votre téléphone, et nulle part ailleurs.** Les documents sont stockés dans la base
-locale du navigateur (IndexedDB). Aucune donnée n'est envoyée à un serveur, aucun compte
-n'est créé, aucune statistique n'est collectée.
+locale du navigateur (IndexedDB). Aucun compte n'est créé, aucune statistique n'est
+collectée, aucun document n'est envoyé où que ce soit.
+
+### La seule exception : l'aide à la saisie d'adresse
+
+Elle mérite d'être dite précisément, parce qu'elle est la seule ligne de ce projet qui
+sorte de l'appareil.
+
+- **Ce qui sort** : le texte que vous tapez dans un champ d'adresse, ou vos coordonnées
+  lorsque vous appuyez sur « Ma position ». Rien d'autre. Ni les noms de vos clients, ni
+  les prix, ni les documents, ni votre identité.
+- **Vers qui** : [Photon](https://photon.komoot.io/), pour retrouver une adresse, et
+  [OSRM](https://project-osrm.org/), pour calculer une distance routière. Tous deux sont
+  ouverts, gratuits, sans compte ni clé d'API, et hébergés en Allemagne par des
+  associations (Komoot, FOSSGIS). Ils ne reçoivent aucune donnée identifiante — pas même
+  un identifiant de compte, puisqu'il n'y en a pas.
+- **Comment l'éteindre** : *Réglages → Aide à la saisie d'adresse*. Une fois désactivée,
+  plus rien ne sort du téléphone. La saisie à la main continue de fonctionner exactement
+  comme avant, et la distance reste modifiable à la main.
+
+Sans connexion, ces services sont simplement injoignables : l'application ne bloque jamais,
+et vous saisissez l'adresse et la distance vous-même.
 
 Conséquence directe, et c'est la chose la plus importante à retenir :
 
@@ -152,7 +181,7 @@ Le guide pas à pas, sans ligne de commande, se trouve dans **[SETUP.md](SETUP.m
 
 ## Ce que les tests vérifient
 
-289 tests, répartis en douze fichiers. Ils ne mesurent pas la quantité de code, mais les
+327 tests, répartis en quatorze fichiers. Ils ne mesurent pas la quantité de code, mais les
 endroits où une erreur coûte cher.
 
 | Fichier | Ce qu'il protège |
@@ -165,6 +194,8 @@ endroits où une erreur coûte cher.
 | `pdf.test.ts` | Le rendu effectif des PDF : quinze documents réellement produits |
 | `factures.test.ts` | Refus de la double facturation, avoirs, statuts, indicateurs |
 | `backup.test.ts` | Aller-retour de sauvegarde fidèle, sauvegarde corrompue refusée |
+| `geo.test.ts` | L'aide à l'adresse face au réseau : coupé, en panne, réponse illisible — la fonction rend toujours la main. Vérifie aussi l'ordre des coordonnées envoyées à OSRM : inversées, elles ne produisent pas d'erreur mais un point au milieu de l'océan, et une distance absurde |
+| `champ-adresse.test.tsx` | Le champ d'adresse : choix d'une proposition, parcours au clavier, et Échap qui referme la liste **sans** fermer la fenêtre qui l'abrite |
 | `app.test.tsx` | Le démarrage réel de l'application : montage, routage, charte, mode contrôle |
 | `format.test.ts`, `validation.test.ts`, `ui.test.tsx` | Dates en heure locale, identifiants administratifs, composants d'interface |
 
@@ -186,6 +217,7 @@ src/
     numbering.ts           Numérotation atomique, sans trou ni doublon
     mentions.ts            Référentiel unique des mentions réglementaires
     backup.ts              Sauvegarde et restauration
+    geo.ts                 Recherche d'adresses et distance routière — le seul appel réseau
     pdf/
       documentData.ts      Contenu imprimé, construit de façon pure et testable
       moteurPdf.tsx        Le moteur de rendu, chargé à la demande
@@ -195,13 +227,13 @@ src/
     factures/              Factures, avoirs, indicateurs
     clients/               Clients enregistrés
     reglages/              Réglages et sauvegarde
-  components/              Interface
-tests/                     Tests automatisés
-scripts/                   Génération des icônes
-.github/workflows/         Compilation et publication automatiques
+  components/              Interface — dont le champ d'adresse assisté
+  tests/                     Tests automatisés
+  scripts/                   Génération des icônes
+  .github/workflows/         Compilation et publication automatiques
 ```
 
-Deux principes structurent le code :
+Trois principes structurent le code :
 
 - **Tout montant est un entier de centimes.** Aucun calcul monétaire n'est fait en nombre
   flottant d'euros. Les seules opérations flottantes autorisées sont les multiplications
@@ -211,7 +243,7 @@ Deux principes structurent le code :
   un PDF déjà émis.
 - **Le moteur PDF n'est pas chargé au démarrage.** La bibliothèque de mise en page est
   isolée dans son propre morceau et n'est téléchargée qu'au premier document généré ou
-  affiché : le démarrage ne pèse que **133 ko compressés** au lieu de 575 ko. Le service
+  affiché : le démarrage ne pèse que **139 ko compressés** au lieu de 580 ko. Le service
   worker la précache malgré tout, donc elle reste disponible hors connexion.
 
 ---
@@ -229,13 +261,22 @@ dépôt**, qui est public. La signature est faite localement, au moment de l'ins
 Les dossiers `ios/` et `android/` ne sont pas versionnés : ils sont régénérés à chaque
 compilation.
 
+**Les autorisations de localisation sont déclarées par la compilation elle-même.** iOS
+exige une explication d'usage dans `Info.plist`, faute de quoi il ferme l'application au
+lieu d'afficher le dialogue. Android exige deux permissions dans son manifeste — le
+manifeste du greffon de géolocalisation est vide, contrairement à celui de Capacitor pour
+la permission Internet. Ces deux dossiers étant régénérés à chaque compilation, les
+déclarations sont réinjectées par les workflows, qui vérifient ensuite qu'elles ont bien
+été écrites : un manifeste incomplet arrête la compilation plutôt que de produire un APK
+dont le bouton « Ma position » échouerait silencieusement.
+
 ---
 
 ## Sécurité et dépendances
 
-Le code livré aux utilisateurs ne dépend que de six bibliothèques :
-`react`, `react-dom`, `react-router-dom`, `dexie`, `fflate` et `@react-pdf/renderer`.
-**Aucune d'elles ne présente de vulnérabilité connue** :
+Le code livré aux utilisateurs ne dépend que de sept bibliothèques :
+`react`, `react-dom`, `react-router-dom`, `dexie`, `fflate`, `@react-pdf/renderer` et
+`@capacitor/geolocation`. **Aucune d'elles ne présente de vulnérabilité connue** :
 
 ```bash
 npm audit --omit=dev   # → found 0 vulnerabilities
@@ -252,8 +293,9 @@ Deux garde-fous sont en place :
 
 - La compilation automatique **échoue** si un fichier de signature (`.keystore`, `.jks`,
   `.p12`, `.mobileprovision`) ou un fichier `.env` est présent dans le dépôt.
-- Aucune donnée ne quitte l'appareil : il n'y a ni serveur, ni compte, ni télémétrie, donc
-  ni fuite possible côté serveur.
+- Aucune donnée ne quitte l'appareil, à la seule exception de l'aide à la saisie d'adresse
+  décrite plus haut — désactivable, et qui ne transmet que le contenu des champs d'adresse.
+  Il n'y a ni serveur, ni compte, ni télémétrie.
 
 ### Binaires natifs de Rollup
 

@@ -164,6 +164,16 @@ export interface Settings {
   signature: string;
   couleurAccent: string;
 
+  /**
+   * Autorise l'aide à la saisie d'adresse : propositions au fil de la frappe, bouton
+   * « Ma position », et calcul automatique de la distance entre deux adresses.
+   *
+   * Ces aides interrogent des services externes — c'est la seule chose de
+   * l'application qui sorte sur le réseau. Désactivé, plus aucune donnée ne quitte
+   * l'appareil et la saisie redevient entièrement manuelle.
+   */
+  aideAdresse: boolean;
+
   derniereSauvegarde: string | null;
 }
 
