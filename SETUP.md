@@ -8,6 +8,19 @@ installer l'application sur votre téléphone.
 
 ---
 
+> **État actuel — les étapes 1 à 5 sont déjà faites.**
+>
+> - Dépôt : <https://github.com/Msoumaya2019/vtc-bons> (public)
+> - Application en ligne : **<https://msoumaya2019.github.io/vtc-bons/>**
+> - Les compilations Android et iOS ont été vérifiées de bout en bout : elles produisent
+>   bien l'APK de test, l'APK de production non signé, l'App Bundle et l'IPA non signé.
+>   Ils se récupèrent dans l'onglet **Actions** du dépôt, en bas de chaque exécution.
+>
+> Ce guide reste la référence si vous refaites l'installation ailleurs. Pour installer
+> l'application sur votre téléphone, allez directement aux **étapes 6 et 7**.
+
+---
+
 ## Ce dont vous avez besoin
 
 - Un compte GitHub (gratuit) — <https://github.com/signup>
