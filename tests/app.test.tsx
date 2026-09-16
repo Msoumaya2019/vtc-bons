@@ -10,7 +10,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { App } from '../src/App';
-import { db, effacerToutesLesDonnees, saveSettings } from '../src/lib/db';
+import { db, effacerToutesLesDonnees, getSettings, saveSettings } from '../src/lib/db';
 import { bonTest, reglagesTest } from './aides';
 
 /**
@@ -38,8 +38,18 @@ vi.mock('../src/lib/geo', () => geoSimule);
  * défaut, une seconde, devient insuffisant sous charge — ce qui produisait des
  * échecs aléatoires sans aucun rapport avec le comportement testé. Ce test ne
  * mesure pas une vitesse : il vérifie un enchaînement.
+ *
+ * Relevé de cinq à dix secondes après une campagne de mesure : sur huit cœurs, les
+ * quatorze environnements de test se disputent les mêmes cœurs, et un ouvrier peut
+ * rester privé de processeur pendant plusieurs secondes. Trois exécutions
+ * consécutives ont échoué, chaque fois sur un test DIFFÉRENT, et chaque fois à
+ * 5 053, 5 067 et 5 067 ms — c'est-à-dire précisément au seuil, jamais avant. Un
+ * défaut de comportement se manifesterait au même endroit à chaque fois ; un
+ * dépassement qui se déplace et qui s'arrête pile sur la limite est un problème de
+ * charge. La même campagne, menée sans les modifications en cours, a échoué de la
+ * même façon : la fragilité ne vient pas du code testé.
  */
-const DELAI = 5_000;
+const DELAI = 10_000;
 
 /**
  * Délai maximal d'un test de ce fichier.
@@ -50,10 +60,16 @@ const DELAI = 5_000;
  * « timed out » qui ne dit rien du comportement — exactement le genre de panne que ce
  * fichier a déjà provoquée une fois.
  *
+ * Le budget doit rester supérieur à la SOMME des attentes d'un même test : le plus
+ * long en enchaîne trois (démarrage, écran, puis deux lectures). À dix secondes
+ * l'attente, trois attentes consomment trente secondes — d'où quarante-cinq, et non
+ * vingt. Relever l'une sans l'autre rendrait le budget incohérent : un échec se
+ * signalerait alors par un « timed out » qui masquerait le comportement observé.
+ *
  * Relevé pour ce fichier seulement : ailleurs, un test qui s'éternise doit continuer
  * d'être signalé vite.
  */
-vi.setConfig({ testTimeout: 20_000 });
+vi.setConfig({ testTimeout: 45_000 });
 
 /** Amène l'application sur une route, puis attend que l'écran correspondant s'affiche. */
 async function attendreEcran(chemin: string, texteAttendu: RegExp | string) {
@@ -409,5 +425,40 @@ describe('aide à la saisie d’adresse', () => {
     fireEvent.change(arrivee, { target: { value: 'Roissy, terminal 2E' } });
 
     await waitFor(() => expect(distance).toHaveValue(18), { timeout: DELAI_ETAT });
+  });
+
+  it('se coupe depuis les réglages, et l’enregistre', async () => {
+    // La case est le seul moyen de faire cesser les appels sortants. Si elle
+    // n'enregistrait pas, le chauffeur croirait avoir coupé quelque chose qui continue
+    // de partir — un réglage de confidentialité qui ne tient pas sa promesse.
+    await saveSettings(reglagesTest());
+    render(<App />);
+    await attendreDemarrage();
+
+    await attendreEcran('#/reglages', 'Réglages');
+
+    // On attend la section elle-même, et non un texte de la page : « Réglages » est aussi
+    // le nom de l'onglet de navigation, si bien qu'une attente sur ce texte serait
+    // satisfaite avant même que la page soit rendue.
+    const section = await screen.findByRole(
+      'button',
+      { name: /Aide à la saisie d’adresse/ },
+      { timeout: DELAI },
+    );
+    expect(section).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(section);
+
+    const case_ = screen.getByLabelText('Proposer des adresses et calculer la distance');
+    expect(case_).toBeChecked();
+
+    fireEvent.click(case_);
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(
+      async () => {
+        expect((await getSettings()).aideAdresse).toBe(false);
+      },
+      { timeout: DELAI_ETAT },
+    );
   });
 });
