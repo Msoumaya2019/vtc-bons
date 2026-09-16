@@ -4,6 +4,7 @@ import { FournisseurToast } from './components/ui/Toast';
 import { FournisseurReglages, useReglages } from './context/ReglagesContext';
 import { FournisseurClients } from './context/ClientsContext';
 import { NouveauBon } from './features/bons/NouveauBon';
+import { PageInstantane } from './features/bons/PageInstantane';
 import { ListeBons } from './features/bons/ListeBons';
 import { DetailBon } from './features/bons/DetailBon';
 import { ModeControle } from './features/bons/ModeControle';
@@ -41,6 +42,7 @@ function Application() {
       <Route element={<Layout />}>
         <Route path="/" element={<Navigate to="/nouveau" replace />} />
         <Route path="/nouveau" element={<NouveauBon />} />
+        <Route path="/instantane" element={<PageInstantane />} />
         <Route path="/bons" element={<ListeBons />} />
         <Route path="/bons/:bonId" element={<DetailBon />} />
         <Route path="/factures" element={<ListeFactures />} />

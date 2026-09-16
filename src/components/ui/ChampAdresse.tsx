@@ -36,8 +36,14 @@ interface PropsChampAdresse {
    * Appelé avec l'adresse complète lorsqu'elle vient d'une proposition ou de la
    * position, et avec null dès que le texte est retouché à la main : les
    * coordonnées connues ne valent alors plus rien.
+   *
+   * FACULTATIF : certains appelants n'ont besoin que du texte — un profil de bon
+   * instantané, dont l'adresse est recopiée telle quelle sur le document. Les
+   * obliger à fournir un rappel vide pour satisfaire une signature les pousserait
+   * à écrire du code mort, et laisserait croire qu'ils exploitent des coordonnées
+   * qu'ils ignorent.
    */
-  onCoordonnees: (adresse: Adresse | null) => void;
+  onCoordonnees?: (adresse: Adresse | null) => void;
   /** Autorise les appels réseau. Faux : le champ redevient une simple saisie. */
   aideActive: boolean;
   /** Propose « Ma position ». À réserver au lieu de prise en charge. */
@@ -122,7 +128,7 @@ export function ChampAdresse({
   const choisir = (adresse: Adresse) => {
     apresChoix.current = true;
     onChange(adresse.libelle);
-    onCoordonnees(adresse);
+    onCoordonnees?.(adresse);
     setPropositions([]);
     setOuverte(false);
     setIndexActif(-1);
@@ -133,7 +139,7 @@ export function ChampAdresse({
     onChange(texte);
     // Toute retouche manuelle invalide les coordonnées retenues : la distance
     // calculée à partir d'elles ne correspondrait plus à ce qui est affiché.
-    onCoordonnees(null);
+    onCoordonnees?.(null);
     setMessage(null);
   };
 

@@ -1,7 +1,14 @@
 import { parametresParDefaut } from '../src/lib/db';
-import { snapshotClient, snapshotEmetteur } from '../src/lib/snapshots';
+import { presetInstantaneVide, snapshotClient, snapshotEmetteur } from '../src/lib/snapshots';
 import { calculerTotaux } from '../src/lib/tva';
-import type { Bon, Client, Facture, LignePrestation, Settings } from '../src/types';
+import type {
+  Bon,
+  Client,
+  Facture,
+  LignePrestation,
+  PresetInstantane,
+  Settings,
+} from '../src/types';
 
 /** Réglages complets et valides, pour les tests. */
 export function reglagesTest(surcharge: Partial<Settings> = {}): Settings {
@@ -42,11 +49,39 @@ export function clientTest(surcharge: Partial<Client> = {}): Client {
     contactSurPlace: '',
     notes: '',
     parDefaut: true,
+    instantane: presetInstantaneVide(),
     creeLe: '2026-01-01T10:00:00.000Z',
     modifieLe: '2026-01-01T10:00:00.000Z',
     supprime: false,
     ...surcharge,
   };
+}
+
+/**
+ * Profil de bon instantané complet et exploitable. Le lieu de prise en charge de
+ * secours est renseigné : sans lui, un échec de localisation rendrait le bon
+ * impossible à émettre, et c'est précisément ce que le profil doit couvrir.
+ */
+export function profilInstantane(surcharge: Partial<PresetInstantane> = {}): PresetInstantane {
+  return {
+    ...presetInstantaneVide(),
+    actif: true,
+    lieuPriseEnCharge: '5 avenue Victor Hugo, 75016 Paris',
+    destination: 'Aéroport Charles-de-Gaulle, terminal 2E',
+    distanceKm: 32,
+    typePrestation: 'transfert_aeroport',
+    libellePrestation: 'Transfert aéroport',
+    prixTTCcentimes: 9500,
+    nombrePassagers: 2,
+    modePaiement: 'cb',
+    notesInternes: 'Client habituel.',
+    ...surcharge,
+  };
+}
+
+/** Client dont le profil instantané est prêt : un seul geste suffit à générer son bon. */
+export function clientInstantaneTest(surcharge: Partial<Client> = {}): Client {
+  return clientTest({ instantane: profilInstantane(), ...surcharge });
 }
 
 export function ligneTest(surcharge: Partial<LignePrestation> = {}): LignePrestation {

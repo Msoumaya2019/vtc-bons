@@ -1,20 +1,41 @@
 import { useMemo, useState } from 'react';
 import { useClients } from '../../context/ClientsContext';
+import { useReglages } from '../../context/ReglagesContext';
 import { useToast } from '../../components/ui/Toast';
 import { Badge, Carte, EtatVide } from '../../components/ui/Carte';
 import { Bouton } from '../../components/ui/Bouton';
 import { Bascule, CaseACocher, Champ, Liste, Saisie, ZoneTexte } from '../../components/ui/Champ';
+import { ChampAdresse } from '../../components/ui/ChampAdresse';
 import { DialogueConfirmation, Modale } from '../../components/ui/Modale';
 import { IconeClients, IconePlus, IconePoubelle, IconeRecherche } from '../../components/icons';
-import { clientVide } from '../../lib/snapshots';
+import { adresseSurUneLigne, clientVide } from '../../lib/snapshots';
+import { formatSaisieEuros, parseSaisieEuros } from '../../lib/money';
 import { validerEmail, validerSiret, validerTelephone, validerTvaIntracom } from '../../lib/validation';
-import { libelleTypeClient } from '../../lib/format';
-import type { Client, TypeClient } from '../../types';
+import { libelleModePaiement, libelleTypeClient, libelleTypePrestation } from '../../lib/format';
+import type {
+  Client,
+  ModePaiement,
+  PresetInstantane,
+  TypeClient,
+  TypePrestation,
+} from '../../types';
+
+const TYPES_PRESTATION: TypePrestation[] = [
+  'course_simple',
+  'transfert_aeroport',
+  'transfert_gare',
+  'mise_a_disposition',
+  'excursion',
+  'forfait',
+];
+
+const MODES_PAIEMENT: ModePaiement[] = ['cb', 'especes', 'virement', 'plateforme', 'facture', 'autre'];
 
 type Erreurs = Partial<Record<'nom' | 'telephone' | 'email' | 'siret' | 'numeroTVAIntracom', string>>;
 
 export function PageClients() {
   const { clients, creer, modifier, supprimer, definirParDefaut, chargement } = useClients();
+  const { settings } = useReglages();
   const toast = useToast();
   const [recherche, setRecherche] = useState('');
   const [enEdition, setEnEdition] = useState<Client | null>(null);
@@ -78,6 +99,36 @@ export function PageClients() {
 
   const maj = <C extends keyof Client>(champ: C, valeur: Client[C]) => {
     setEnEdition((precedent) => (precedent ? { ...precedent, [champ]: valeur } : precedent));
+  };
+
+  const majInstantane = <C extends keyof PresetInstantane>(
+    champ: C,
+    valeur: PresetInstantane[C],
+  ) => {
+    setEnEdition((precedent) =>
+      precedent
+        ? { ...precedent, instantane: { ...precedent.instantane, [champ]: valeur } }
+        : precedent,
+    );
+  };
+
+  /**
+   * Active ou désactive le profil instantané.
+   *
+   * À la première activation, le lieu de prise en charge est pré-rempli avec l'adresse
+   * du client. C'est le plus souvent le bon endroit, et cela évite le champ vide qui
+   * ferait échouer la génération au pire moment. Le chauffeur reste libre de le
+   * corriger, et la position le remplacera de toute façon s'il l'a demandé.
+   */
+  const activerInstantane = (actif: boolean) => {
+    setEnEdition((precedent) => {
+      if (!precedent) return precedent;
+      const instantane = { ...precedent.instantane, actif };
+      if (actif && !instantane.lieuPriseEnCharge.trim()) {
+        instantane.lieuPriseEnCharge = adresseSurUneLigne(precedent);
+      }
+      return { ...precedent, instantane };
+    });
   };
 
   return (
@@ -330,6 +381,173 @@ export function PageClients() {
               checked={enEdition.parDefaut}
               onChange={(valeur) => maj('parDefaut', valeur)}
             />
+
+            <CaseACocher
+              label="Bon instantané"
+              aide="Ce client apparaît dans l’onglet Instantané, où un seul geste génère son bon."
+              checked={enEdition.instantane.actif}
+              onChange={activerInstantane}
+            />
+
+            {enEdition.instantane.actif ? (
+              <div className="space-y-4 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                <p className="aide-champ">
+                  Ces informations ne figurent pas sur la fiche client : elles décrivent la course
+                  habituelle, et sont recopiées sur le bon à chaque génération. Le nom et le
+                  téléphone, eux, viennent de la fiche ci-dessus — ils ne sont pas répétés ici.
+                </p>
+
+                <CaseACocher
+                  label="Prendre ma position comme lieu de prise en charge"
+                  aide="À la génération, votre position est convertie en adresse. Décochez pour toujours utiliser l’adresse ci-dessous."
+                  checked={enEdition.instantane.utiliserMaPosition}
+                  onChange={(valeur) => majInstantane('utiliserMaPosition', valeur)}
+                />
+
+                <ChampAdresse
+                  label={
+                    enEdition.instantane.utiliserMaPosition
+                      ? 'Lieu de prise en charge (secours)'
+                      : 'Lieu de prise en charge'
+                  }
+                  aide={
+                    enEdition.instantane.utiliserMaPosition
+                      ? 'Utilisé si la position n’est pas obtenue : hors connexion, autorisation refusée, ou aide à la saisie coupée. Sans lui, un échec de localisation rendrait le bon impossible à émettre.'
+                      : 'C’est la mention 7 du justificatif, celle qu’un agent vérifiera en premier.'
+                  }
+                  valeur={enEdition.instantane.lieuPriseEnCharge}
+                  onChange={(valeur) => majInstantane('lieuPriseEnCharge', valeur)}
+                  aideActive={settings?.aideAdresse ?? false}
+                  obligatoire
+                  mentionReglementaire
+                  placeholder="Ex. 5 avenue Victor Hugo, 75016 Paris"
+                />
+
+                <ChampAdresse
+                  label="Destination habituelle"
+                  valeur={enEdition.instantane.destination}
+                  onChange={(valeur) => majInstantane('destination', valeur)}
+                  aideActive={settings?.aideAdresse ?? false}
+                  placeholder="Ex. Aéroport Charles-de-Gaulle, terminal 2E"
+                />
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Champ
+                    label="Prix habituel TTC (€)"
+                    aide="Le HT et la TVA sont recalculés selon votre régime."
+                  >
+                    {(id) => (
+                      <Saisie
+                        id={id}
+                        inputMode="decimal"
+                        value={formatSaisieEuros(enEdition.instantane.prixTTCcentimes)}
+                        onChange={(evenement) => {
+                          const centimes = parseSaisieEuros(evenement.target.value);
+                          if (centimes === null) return;
+                          majInstantane('prixTTCcentimes', centimes);
+                        }}
+                      />
+                    )}
+                  </Champ>
+                  <Champ
+                    label="Distance habituelle (km)"
+                    aide="Évite un calcul au moment de générer."
+                  >
+                    {(id) => (
+                      <Saisie
+                        id={id}
+                        type="number"
+                        step="0.1"
+                        min={0}
+                        value={enEdition.instantane.distanceKm ?? ''}
+                        onChange={(evenement) =>
+                          majInstantane(
+                            'distanceKm',
+                            evenement.target.value === '' ? null : Number(evenement.target.value),
+                          )
+                        }
+                      />
+                    )}
+                  </Champ>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Champ label="Nombre de passagers">
+                    {(id) => (
+                      <Saisie
+                        id={id}
+                        type="number"
+                        min={1}
+                        value={enEdition.instantane.nombrePassagers ?? ''}
+                        onChange={(evenement) =>
+                          majInstantane(
+                            'nombrePassagers',
+                            evenement.target.value === '' ? null : Number(evenement.target.value),
+                          )
+                        }
+                      />
+                    )}
+                  </Champ>
+                  <Champ label="Mode de paiement">
+                    {(id) => (
+                      <Liste
+                        id={id}
+                        value={enEdition.instantane.modePaiement}
+                        onChange={(evenement) =>
+                          majInstantane('modePaiement', evenement.target.value as ModePaiement)
+                        }
+                      >
+                        {MODES_PAIEMENT.map((mode) => (
+                          <option key={mode} value={mode}>
+                            {libelleModePaiement(mode)}
+                          </option>
+                        ))}
+                      </Liste>
+                    )}
+                  </Champ>
+                </div>
+
+                <Champ label="Type de prestation">
+                  {(id) => (
+                    <Liste
+                      id={id}
+                      value={enEdition.instantane.typePrestation}
+                      onChange={(evenement) =>
+                        majInstantane('typePrestation', evenement.target.value as TypePrestation)
+                      }
+                    >
+                      {TYPES_PRESTATION.map((type) => (
+                        <option key={type} value={type}>
+                          {libelleTypePrestation(type)}
+                        </option>
+                      ))}
+                    </Liste>
+                  )}
+                </Champ>
+
+                <Champ label="Désignation sur le bon">
+                  {(id) => (
+                    <Saisie
+                      id={id}
+                      value={enEdition.instantane.libellePrestation}
+                      onChange={(evenement) =>
+                        majInstantane('libellePrestation', evenement.target.value)
+                      }
+                    />
+                  )}
+                </Champ>
+
+                <Champ label="Notes internes" aide="Jamais imprimées.">
+                  {(id) => (
+                    <ZoneTexte
+                      id={id}
+                      value={enEdition.instantane.notesInternes}
+                      onChange={(evenement) => majInstantane('notesInternes', evenement.target.value)}
+                    />
+                  )}
+                </Champ>
+              </div>
+            ) : null}
           </>
         ) : null}
       </Modale>

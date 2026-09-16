@@ -100,10 +100,62 @@ export interface SnapshotClient {
   contactSurPlace: string;
 }
 
+/**
+ * PROFIL DE BON INSTANTANÉ.
+ *
+ * Tout ce qu'il faut pour émettre un bon en un seul geste, décidé une fois pour
+ * toutes et rangé sur la fiche du client concerné.
+ *
+ * Pourquoi sur le client, et non dans les Réglages : c'est le CLIENT que le chauffeur
+ * désigne du doigt au moment de partir. Un profil rangé ailleurs devrait être relié
+ * à la main, et cette liaison serait une occasion de se tromper de profil — au pire
+ * moment, c'est-à-dire au moment où le client monte.
+ *
+ * Ce profil ne recopie AUCUNE mention obligatoire déjà portée par la fiche client
+ * (nom, téléphone) : les dupliquer créerait deux sources de vérité, qui finiraient
+ * par diverger. Il ne contient que ce que la fiche client ne dit pas.
+ */
+export interface PresetInstantane {
+  /** Le client apparaît dans l'onglet Instantané. */
+  actif: boolean;
+  /**
+   * Remplacer le lieu de prise en charge par la position du chauffeur au moment de
+   * générer. C'est ce qui rend le geste unique possible : le chauffeur est sur place.
+   */
+  utiliserMaPosition: boolean;
+  /**
+   * Lieu de prise en charge de secours, utilisé quand la position n'est pas obtenue —
+   * hors connexion, autorisation refusée, ou aide à la saisie coupée. C'est un repli,
+   * pas un doublon : sans lui, une panne de localisation rendrait le bon inutilisable.
+   */
+  lieuPriseEnCharge: string;
+  destination: string;
+  /**
+   * Distance habituelle, en kilomètres. Saisie une fois, elle évite un appel réseau
+   * au moment de générer — c'est-à-dire exactement quand on n'a pas le temps.
+   */
+  distanceKm: number | null;
+  typePrestation: TypePrestation;
+  /** Désignation portée sur la ligne de prestation. */
+  libellePrestation: string;
+  /**
+   * Prix habituel, en CENTIMES, exprimé TTC — c'est-à-dire tel que le chauffeur
+   * l'annonce à son client. Le HT et la TVA sont recalculés à la génération, selon
+   * le régime et le taux par défaut des Réglages. Stocker le HT obligerait le
+   * chauffeur à faire lui-même la conversion à l'envers, au moment de configurer.
+   */
+  prixTTCcentimes: number;
+  nombrePassagers: number | null;
+  modePaiement: ModePaiement;
+  notesInternes: string;
+}
+
 export interface Client extends SnapshotClient {
   id: string;
   notes: string;
   parDefaut: boolean;
+  /** Profil du bon instantané. Voir `PresetInstantane`. */
+  instantane: PresetInstantane;
   creeLe: string;
   modifieLe: string;
   supprime: boolean;

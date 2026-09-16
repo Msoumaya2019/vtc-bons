@@ -7,7 +7,7 @@
  * document non conforme et un risque en cas de contrôle.
  */
 
-import type { Client, Settings, SnapshotClient, SnapshotEmetteur } from '../types';
+import type { Client, PresetInstantane, Settings, SnapshotClient, SnapshotEmetteur } from '../types';
 
 export function snapshotEmetteur(settings: Settings): SnapshotEmetteur {
   return {
@@ -57,6 +57,29 @@ export function snapshotClient(client: Client): SnapshotClient {
   };
 }
 
+/**
+ * Profil de bon instantané vide. Désactivé : un client n'apparaît dans l'onglet
+ * Instantané que si le chauffeur l'y a explicitement mis. L'inverse ferait surgir
+ * des profils non renseignés, qui échoueraient au moment de générer.
+ */
+export function presetInstantaneVide(): PresetInstantane {
+  return {
+    actif: false,
+    // Activé par défaut : c'est l'intérêt du geste unique, et cela reste sans effet
+    // tant que le profil n'est pas lui-même activé.
+    utiliserMaPosition: true,
+    lieuPriseEnCharge: '',
+    destination: '',
+    distanceKm: null,
+    typePrestation: 'course_simple',
+    libellePrestation: 'Transport de personnes',
+    prixTTCcentimes: 0,
+    nombrePassagers: null,
+    modePaiement: 'cb',
+    notesInternes: '',
+  };
+}
+
 export function clientVide(): Client {
   const maintenant = new Date().toISOString();
   return {
@@ -75,10 +98,25 @@ export function clientVide(): Client {
     contactSurPlace: '',
     notes: '',
     parDefaut: false,
+    instantane: presetInstantaneVide(),
     creeLe: maintenant,
     modifieLe: maintenant,
     supprime: false,
   };
+}
+
+/**
+ * Complète un client relu de la base.
+ *
+ * Les fiches enregistrées avant l'arrivée du bon instantané n'ont pas de champ
+ * `instantane`. Sans cette relecture, elles arriveraient avec `undefined` et l'onglet
+ * Instantané planterait — sur les données existantes de l'utilisateur, c'est-à-dire
+ * exactement là où une régression coûte le plus cher. La fusion est superficielle à
+ * dessein : le profil est plat, et une fusion récursive masquerait un profil
+ * volontairement vide derrière les valeurs par défaut.
+ */
+export function normaliserClient(client: Client): Client {
+  return { ...client, instantane: { ...presetInstantaneVide(), ...client.instantane } };
 }
 
 /** Adresse postale sur une seule ligne, pour les PDF. */

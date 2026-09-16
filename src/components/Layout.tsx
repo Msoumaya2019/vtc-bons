@@ -2,15 +2,26 @@ import { NavLink, Outlet } from 'react-router-dom';
 import {
   IconeBons,
   IconeClients,
+  IconeEclair,
   IconeFactures,
   IconeNouveau,
   IconeReglages,
 } from './icons';
 
+/**
+ * Barre d'onglets.
+ *
+ * Les libellés « Mes bons » et « Mes factures » sont devenus « Bons » et
+ * « Factures » en accueillant un sixième onglet : à six, la largeur d'un onglet sur
+ * un téléphone ne permet plus de porter le possessif, et un libellé qui passe à la
+ * ligne dans une barre de hauteur fixe est un libellé tronqué. Les pages, elles,
+ * gardent leurs titres complets.
+ */
 const onglets = [
   { chemin: '/nouveau', libelle: 'Nouveau', Icone: IconeNouveau },
-  { chemin: '/bons', libelle: 'Mes bons', Icone: IconeBons },
-  { chemin: '/factures', libelle: 'Mes factures', Icone: IconeFactures },
+  { chemin: '/instantane', libelle: 'Instantané', Icone: IconeEclair },
+  { chemin: '/bons', libelle: 'Bons', Icone: IconeBons },
+  { chemin: '/factures', libelle: 'Factures', Icone: IconeFactures },
   { chemin: '/clients', libelle: 'Clients', Icone: IconeClients },
   { chemin: '/reglages', libelle: 'Réglages', Icone: IconeReglages },
 ];

@@ -129,12 +129,22 @@ describe('démarrage', () => {
     expect(await db.settings.get('app')).toBeDefined();
   });
 
-  it('présente les cinq onglets de navigation', async () => {
+  it('présente les six onglets de navigation', async () => {
     render(<App />);
     await attendreDemarrage();
 
     const navigation = screen.getByRole('navigation', { name: 'Navigation principale' });
-    for (const libelle of ['Nouveau', 'Mes bons', 'Mes factures', 'Clients', 'Réglages']) {
+    // Les libellés « Mes bons » et « Mes factures » ont été raccourcis en accueillant
+    // le sixième onglet : à six, la largeur disponible sur un téléphone ne permet plus
+    // de porter le possessif. Ce test les fige donc dans leur forme courte.
+    for (const libelle of [
+      'Nouveau',
+      'Instantané',
+      'Bons',
+      'Factures',
+      'Clients',
+      'Réglages',
+    ]) {
       expect(navigation).toHaveTextContent(libelle);
     }
   });

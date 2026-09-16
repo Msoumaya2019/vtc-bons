@@ -25,6 +25,16 @@ C'est l'écran à montrer à un agent.
 **Vos clients enregistrés.** Vous saisissez vos coordonnées une fois. Vous enregistrez
 deux ou trois clients habituels, et vous n'avez plus à les ressaisir.
 
+**L'onglet Instantané.** Pour vos courses récurrentes, un seul geste suffit : vous appuyez
+sur le client, et le bon est émis. Le lieu de prise en charge est **votre position du
+moment**, convertie en adresse ; la destination, le prix et le reste viennent du profil que
+vous avez renseigné une fois pour toutes sur la fiche du client. Aucun formulaire, aucune
+confirmation, aucun calcul à attendre.
+
+Si votre position n'est pas disponible — hors connexion, autorisation refusée — le lieu de
+prise en charge enregistré dans le profil est utilisé, et l'application vous le dit. Le bon
+est émis dans les deux cas.
+
 **L'adresse assistée.** Vous tapez les premières lettres du lieu de prise en charge : les
 propositions s'affichent, comme sur une carte. Un bouton **« Ma position »** remplit
 l'adresse de départ sans que vous ayez à la saisir. La distance et la durée du trajet se
@@ -58,6 +68,20 @@ Sept mentions sont obligatoires :
 L'application **refuse d'émettre** un bon s'il manque l'une d'elles. Elle refuse également
 un bon dont la réservation serait datée après la prise en charge : un justificatif daté
 après la course ne prouve pas qu'il y a eu réservation, il prouve le contraire.
+
+### Le cas du bon instantané
+
+Un bon instantané est daté de l'instant où vous le générez : la réservation et la prise en
+charge portent alors la même date et la même heure. C'est accepté — la règle interdit une
+réservation *postérieure*, pas une réservation simultanée.
+
+Mais dites-le-vous ainsi : **c'est le justificatif le plus faible que l'application puisse
+produire.** Il établit que le bon existait au moment du contrôle, pas que la course avait
+été réservée à l'avance. Générez-le donc **avant que le client ne monte**, jamais après la
+course — un bon instantané créé à l'arrivée ne prouverait rien du tout.
+
+Quand vous connaissez la course à l'avance, passez par *Nouveau* : la date de réservation y
+est distincte, et le justificatif est bien plus solide.
 
 En l'absence de justificatif, l'infraction est une contravention de 5ᵉ classe
 (**article R. 3124-11** du Code des transports), passible de 1 500 €, doublée en cas de
@@ -181,7 +205,7 @@ Le guide pas à pas, sans ligne de commande, se trouve dans **[SETUP.md](SETUP.m
 
 ## Ce que les tests vérifient
 
-326 tests, répartis en quatorze fichiers. Ils ne mesurent pas la quantité de code, mais les
+359 tests, répartis en seize fichiers. Ils ne mesurent pas la quantité de code, mais les
 endroits où une erreur coûte cher.
 
 | Fichier | Ce qu'il protège |
@@ -196,6 +220,8 @@ endroits où une erreur coûte cher.
 | `backup.test.ts` | Aller-retour de sauvegarde fidèle, sauvegarde corrompue refusée |
 | `geo.test.ts` | L'aide à l'adresse face au réseau : coupé, en panne, réponse illisible — la fonction rend toujours la main. Vérifie aussi l'ordre des coordonnées envoyées à OSRM : inversées, elles ne produisent pas d'erreur mais un point au milieu de l'océan, et une distance absurde |
 | `champ-adresse.test.tsx` | Le champ d'adresse : choix d'une proposition, parcours au clavier, et Échap qui referme la liste **sans** fermer la fenêtre qui l'abrite |
+| `instantane.test.ts` | Le bon instantané : conversion du prix TTC en HT (sans quoi le client paierait la TVA deux fois), repli sur l'adresse du profil quand la position manque, et surtout l'absence de brouillon laissé derrière un échec |
+| `instantane-ecran.test.tsx` | L'onglet Instantané : profil incomplet annoncé **avant** l'appui, génération en un clic, réserve qui reste affichée, et relecture d'une fiche client enregistrée avant cette fonctionnalité |
 | `app.test.tsx` | Le démarrage réel de l'application : montage, routage, charte, mode contrôle |
 | `format.test.ts`, `validation.test.ts`, `ui.test.tsx` | Dates en heure locale, identifiants administratifs, composants d'interface |
 
@@ -223,9 +249,9 @@ src/
       moteurPdf.tsx        Le moteur de rendu, chargé à la demande
       generate.ts          Entrée du service PDF
   features/
-    bons/                  Bons de commande, contrôle de conformité, mode contrôle
+    bons/                  Bons de commande, bon instantané, contrôle de conformité, mode contrôle
     factures/              Factures, avoirs, indicateurs
-    clients/               Clients enregistrés
+    clients/               Clients enregistrés, et leur profil de bon instantané
     reglages/              Réglages et sauvegarde
   components/              Interface — dont le champ d'adresse assisté
   tests/                     Tests automatisés
@@ -243,7 +269,7 @@ Trois principes structurent le code :
   un PDF déjà émis.
 - **Le moteur PDF n'est pas chargé au démarrage.** La bibliothèque de mise en page est
   isolée dans son propre morceau et n'est téléchargée qu'au premier document généré ou
-  affiché : le démarrage ne pèse que **139 ko compressés** au lieu de 580 ko. Le service
+  affiché : le démarrage ne pèse que **142 ko compressés** au lieu de 584 ko. Le service
   worker la précache malgré tout, donc elle reste disponible hors connexion.
 
 ---

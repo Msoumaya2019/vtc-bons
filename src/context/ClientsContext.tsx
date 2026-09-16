@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from 'react';
 import { db } from '../lib/db';
 import { identifiant, journaliser } from '../lib/audit';
-import { clientVide } from '../lib/snapshots';
+import { clientVide, normaliserClient } from '../lib/snapshots';
 import type { Client } from '../types';
 
 interface ContexteClients {
@@ -25,7 +25,10 @@ export function FournisseurClients({ children }: { children: ReactNode }) {
   const recharger = useCallback(async () => {
     setChargement(true);
     const tous = await db.clients.toArray();
-    setClients(tous.filter((client) => !client.supprime));
+    // Normalisation à la lecture : les fiches enregistrées avant le bon instantané
+    // n'ont pas de profil. Les compléter ici, plutôt qu'à chaque usage, évite que
+    // chaque écran ait à se protéger d'un champ manquant.
+    setClients(tous.filter((client) => !client.supprime).map(normaliserClient));
     setChargement(false);
   }, []);
 

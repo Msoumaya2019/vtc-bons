@@ -61,6 +61,33 @@ export function PageAide() {
       </Carte>
 
       <Carte className="space-y-2">
+        <h2 className="section-titre">Le bon instantané, et ce qu’il ne prouve pas</h2>
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          L’onglet <strong>Instantané</strong> génère un bon en un seul geste : vous appuyez sur le
+          client, votre position devient le lieu de prise en charge, et le bon est émis. La
+          destination, le prix et le reste viennent du profil que vous avez renseigné une fois pour
+          toutes sur sa fiche.
+        </p>
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          Un tel bon est daté de l’instant où vous le générez : la réservation et la prise en charge
+          portent alors la même heure. C’est accepté — la règle interdit une réservation{' '}
+          <em>postérieure</em> à la prise en charge, pas une réservation simultanée.
+        </p>
+        <Bandeau ton="attention" titre="Générez-le avant que le client ne monte">
+          Un bon instantané créé après la course ne prouve rien. C’est le justificatif le plus
+          faible que l’application puisse produire : il établit que le bon existait au moment du
+          contrôle, pas que la course avait été réservée à l’avance. Quand vous connaissez la course
+          à l’avance, passez par <strong>Nouveau</strong> : la date de réservation y est distincte,
+          et le justificatif est bien plus solide.
+        </Bandeau>
+        <p className="aide-champ">
+          Si votre position n’est pas disponible — hors connexion, autorisation refusée, ou aide à
+          la saisie d’adresse coupée — le lieu de prise en charge enregistré dans le profil est
+          utilisé, et l’application vous le signale. Le bon est émis dans les deux cas.
+        </p>
+      </Carte>
+
+      <Carte className="space-y-2">
         <h2 className="section-titre">TVA applicable au transport de personnes</h2>
         <p className="text-sm text-slate-600 dark:text-slate-300">
           Le transport de personnes par VTC relève du taux réduit de <strong>10 %</strong>{' '}

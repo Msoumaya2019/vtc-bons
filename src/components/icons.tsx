@@ -193,3 +193,12 @@ export function IconeVoiture(p: PropsIcone) {
     </Svg>
   );
 }
+
+/** Éclair : le bon instantané, généré d'un seul geste. */
+export function IconeEclair(p: PropsIcone) {
+  return (
+    <Svg {...p}>
+      <path d="M13 2L4 14h7l-1 8 9-12h-7z" />
+    </Svg>
+  );
+}
