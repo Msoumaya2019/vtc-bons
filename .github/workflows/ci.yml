@@ -35,6 +35,14 @@ jobs:
       - name: Installer les dépendances
         run: npm ci
 
+      - name: Vérifier les binaires natifs de Rollup
+        # Le lock ne peut pas, à lui seul, couvrir toutes les plateformes : npm
+        # n'y inscrit que celles de la machine qui l'a produit (bug npm #4828).
+        # package.json déclare donc les binaires Linux et macOS à la main. S'ils
+        # se désalignent de la version de Rollup, la compilation casserait ici
+        # seulement — jamais en local sous Windows. Autant le dire clairement.
+        run: npm run verifier:binaires
+
       - name: Vérifier qu'aucun secret n'est versionné
         # Le dépôt est public : un keystore ou un fichier .env committé par erreur
         # serait exposé définitivement. On échoue AVANT de compiler quoi que ce soit.

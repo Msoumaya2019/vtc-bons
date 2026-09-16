@@ -18,6 +18,7 @@
     "typecheck": "tsc --noEmit",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"tests/**/*.ts\"",
     "icons": "node scripts/generate-icons.mjs",
+    "verifier:binaires": "node scripts/verifier-rollup.mjs",
     "cap:sync": "npm run build && cap sync",
     "cap:ios": "npm run build && cap sync ios && cap open ios",
     "cap:android": "npm run build && cap sync android && cap open android"
@@ -57,6 +58,12 @@
     "vite": "^8.3.0",
     "vite-plugin-pwa": "^1.3.0",
     "vitest": "^5.0.1"
+  },
+  "//": "Les dépendances optionnelles ci-dessous ne servent pas au code : elles forcent npm à inscrire dans package-lock.json les binaires natifs de Rollup pour Linux et macOS. Sans elles, npm ci produit une installation où Rollup ne démarre pas sur la CI (bug npm #4828). Leurs versions doivent rester égales à celle de Rollup — la CI le vérifie. Voir README, section « Binaires natifs de Rollup ».",
+  "optionalDependencies": {
+    "@rollup/rollup-darwin-arm64": "4.63.3",
+    "@rollup/rollup-darwin-x64": "4.63.3",
+    "@rollup/rollup-linux-x64-gnu": "4.63.3"
   },
   "overrides": {
     "tar": "^7.5.22"
