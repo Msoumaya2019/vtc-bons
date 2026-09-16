@@ -746,6 +746,15 @@ export function PageReglages() {
         </Bandeau>
       ) : null}
 
+      {/* Repère de version. Il n'est pas décoratif : un onglet ou une application déjà
+          ouverts continuent d'exécuter l'ancien code après une mise à jour, si bien
+          qu'un défaut DÉJÀ corrigé peut être signalé une seconde fois — c'est arrivé.
+          Cette ligne permet au chauffeur de dire quelle version il a sous les yeux, et
+          de vérifier lui-même qu'une installation a bien pris. */}
+      <p className="texte-muet pt-2 text-center" data-testid="version-application">
+        {libelleVersion()}
+      </p>
+
       <div className="zone-sure-bas fixed inset-x-0 bottom-[56px] z-20 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
         <div className="mx-auto flex w-full max-w-2xl items-center justify-between gap-3">
           <span className="texte-muet">
@@ -764,4 +773,20 @@ export function PageReglages() {
       </div>
     </div>
   );
+}
+
+/**
+ * Repère de version affiché en bas des Réglages.
+ *
+ * Les deux valeurs sont gravées dans le bundle à la compilation (`define`, dans
+ * `vite.config.ts`) : ce sont le commit et sa date, et non la date de compilation, pour
+ * que deux constructions du même code soient identiques.
+ *
+ * Le test `typeof` protège du cas où la substitution n'a pas eu lieu — la ligne affiche
+ * alors « Version inconnue » plutôt que de faire planter l'écran des Réglages.
+ */
+function libelleVersion(): string {
+  if (typeof __DATE_COMMIT__ !== 'string' || __DATE_COMMIT__ === '') return 'Version inconnue';
+  const [annee, mois, jour] = __DATE_COMMIT__.split('-');
+  return `Version du ${jour}/${mois}/${annee} (${__COMMIT__})`;
 }

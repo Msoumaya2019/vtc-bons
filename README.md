@@ -205,7 +205,7 @@ Le guide pas à pas, sans ligne de commande, se trouve dans **[SETUP.md](SETUP.m
 
 ## Ce que les tests vérifient
 
-382 tests, répartis en seize fichiers. Ils ne mesurent pas la quantité de code, mais les
+383 tests, répartis en seize fichiers. Ils ne mesurent pas la quantité de code, mais les
 endroits où une erreur coûte cher.
 
 | Fichier | Ce qu'il protège |
@@ -222,7 +222,7 @@ endroits où une erreur coûte cher.
 | `champ-adresse.test.tsx` | Le champ d'adresse : choix d'une proposition, parcours au clavier, et Échap qui referme la liste **sans** fermer la fenêtre qui l'abrite |
 | `instantane.test.ts` | Le bon instantané : conversion du prix TTC en HT (sans quoi le client paierait la TVA deux fois), repli sur l'adresse du profil quand la position manque, refus d'un profil sans prix (un bon à 0 € est légalement valable — le contrôle de conformité ne peut donc pas l'attraper), et surtout l'absence de brouillon laissé derrière un échec |
 | `instantane-ecran.test.tsx` | L'onglet Instantané : profil incomplet annoncé **avant** l'appui, génération en un clic, réserve qui reste affichée, et relecture d'une fiche client enregistrée avant cette fonctionnalité |
-| `app.test.tsx` | Le démarrage réel de l'application : montage, routage, charte, mode contrôle. Vérifie aussi la saisie des montants : un champ qui réécrit sa valeur à chaque frappe se réécrit sous le doigt, le curseur repart à la fin et un chiffre tapé après la virgule ne change rien — invisible au clavier d'un ordinateur, systématique sur un téléphone |
+| `app.test.tsx` | Le démarrage réel de l'application : montage, routage, charte, mode contrôle, et le repère de version des Réglages — sans lui, un essai sur le téléphone ne dit pas quelle version a été essayée. Vérifie aussi la saisie des montants : un champ qui réécrit sa valeur à chaque frappe se réécrit sous le doigt, le curseur repart à la fin et un chiffre tapé après la virgule ne change rien — invisible au clavier d'un ordinateur, systématique sur un téléphone |
 | `format.test.ts`, `validation.test.ts`, `ui.test.tsx` | Dates en heure locale, identifiants administratifs, composants d'interface — dont la saisie d'un montant : champ vide quand le montant est nul, texte conservé tel qu'il est tapé, contenu sélectionné au focus, et saisie illisible gardée à l'écran plutôt que remplacée |
 
 Le test le plus utile est peut-être `app.test.tsx` : c'est le seul capable de détecter une
@@ -281,6 +281,18 @@ Trois principes structurent le code :
 | Navigateur / PWA | GitHub Pages, via le workflow « Publier la version web » |
 | Android | `android.yml` produit un APK de test, un APK de production non signé et un App Bundle non signé |
 | iOS | `ios-unsigned.yml` produit un IPA non signé, à signer soi-même (eSign, Sideloadly…) |
+
+**Une mise à jour ne se voit pas toute seule.** Un onglet déjà ouvert, comme une
+application déjà installée, continuent d'exécuter l'ancien code : le service worker
+remplace bien le cache, mais la page en cours garde le JavaScript qu'elle a chargé au
+démarrage. Un défaut déjà corrigé a été signalé une seconde fois pour cette raison — le
+chauffeur testait une version antérieure sans que rien ne le lui dise.
+
+Les Réglages affichent donc, tout en bas, la version réellement exécutée, sous la forme
+« Version du 16/09/2026 (5019bdd) ». C'est le commit qui est gravé dans le bundle à la
+compilation, et non la date de compilation : deux constructions du même code restent ainsi
+identiques, ce qui permet de comparer le bundle publié avec une construction locale. En
+cas de doute sur ce qui est réellement installé, c'est cette ligne qu'il faut lire.
 
 **Aucun certificat, aucune clé de signature, aucun mot de passe n'est stocké dans ce
 dépôt**, qui est public. La signature est faite localement, au moment de l'installation.

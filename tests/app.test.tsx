@@ -225,6 +225,24 @@ describe('routes', () => {
     await attendreEcran('#/reglages', 'Réglages');
   });
 
+  it('affiche le repère de version, sans quoi un essai ne dit pas ce qui a été essayé', async () => {
+    // Un onglet ou une application déjà ouverts continuent d'exécuter l'ancien code après
+    // une mise à jour : un défaut DÉJÀ corrigé a été signalé une seconde fois pour cette
+    // raison. Ce repère est la seule chose qui permette de savoir quelle version est à
+    // l'écran — et de vérifier qu'une installation a bien pris.
+    //
+    // La forme est vérifiée, et non la simple présence : « Version inconnue » est le
+    // message de repli quand la substitution n'a pas eu lieu à la compilation. Une
+    // assertion qui se contenterait de « Version » passerait aussi dans ce cas, et ne
+    // protégerait donc rien.
+    render(<App />);
+    await attendreDemarrage();
+    await attendreEcran('#/reglages', 'Réglages');
+
+    const repere = await screen.findByTestId('version-application', {}, { timeout: DELAI });
+    expect(repere).toHaveTextContent(/^Version du \d{2}\/\d{2}\/\d{4} \([0-9a-f]{7,}\)$/);
+  });
+
   it('ouvre l’aide et la conformité', async () => {
     render(<App />);
     await attendreDemarrage();
@@ -526,9 +544,19 @@ describe('saisie des montants', () => {
     });
     const remise = screen.getByLabelText('Remise (%)') as HTMLInputElement;
 
-    fireEvent.change(remise, { target: { value: '1,5' } });
+    // Le geste du chauffeur, touche par touche — c'est ce déroulé qui avait été
+    // signalé : « je mets 1, ça met 1 ; je mets la virgule, ça efface le 1 ; je mets
+    // le 5, ça met 5 ». L'étape intermédiaire compte autant que le résultat : un champ
+    // qui ne survit pas à la virgule ne peut jamais atteindre « 1,5 ».
+    fireEvent.change(remise, { target: { value: '1' } });
+    expect(remise.value).toBe('1');
 
+    fireEvent.change(remise, { target: { value: '1,' } });
+    expect(remise.value).toBe('1,');
+
+    fireEvent.change(remise, { target: { value: '1,5' } });
     expect(remise.value).toBe('1,5');
+
     // 1,5 % de 100 € : 98,50 € HT, et non 100 €. On vise la ligne « Total HT » : le
     // montant apparaît aussi dans le détail de TVA, où il désigne la base taxable.
     expect(screen.getByText('Total HT').closest('div')).toHaveTextContent('98,50 €');
