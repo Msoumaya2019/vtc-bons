@@ -144,6 +144,7 @@ Le guide pas à pas, sans ligne de commande, se trouve dans **[SETUP.md](SETUP.m
 | `npm run typecheck` | Vérification des types seule |
 | `npm run format` | Mise en forme automatique |
 | `npm run icons` | Régénère les icônes de l'application |
+| `npm run verifier:binaires` | Vérifie que les binaires natifs de Rollup suivent sa version |
 | `npm run cap:android` | Ouvre le projet Android dans Android Studio |
 | `npm run cap:ios` | Ouvre le projet iOS dans Xcode |
 
@@ -151,7 +152,7 @@ Le guide pas à pas, sans ligne de commande, se trouve dans **[SETUP.md](SETUP.m
 
 ## Ce que les tests vérifient
 
-288 tests, répartis en douze fichiers. Ils ne mesurent pas la quantité de code, mais les
+289 tests, répartis en douze fichiers. Ils ne mesurent pas la quantité de code, mais les
 endroits où une erreur coûte cher.
 
 | Fichier | Ce qu'il protège |
@@ -253,6 +254,28 @@ Deux garde-fous sont en place :
   `.p12`, `.mobileprovision`) ou un fichier `.env` est présent dans le dépôt.
 - Aucune donnée ne quitte l'appareil : il n'y a ni serveur, ni compte, ni télémétrie, donc
   ni fuite possible côté serveur.
+
+### Binaires natifs de Rollup
+
+`package.json` déclare trois dépendances optionnelles qui ne servent pas au code :
+`@rollup/rollup-linux-x64-gnu`, `@rollup/rollup-darwin-arm64` et `@rollup/rollup-darwin-x64`.
+
+Ce n'est pas un choix esthétique. npm n'inscrit dans `package-lock.json` que les dépendances
+optionnelles correspondant à la plateforme sur laquelle le lock a été produit
+([bug npm #4828](https://github.com/npm/cli/issues/4828)). Ce dépôt étant développé sous
+Windows, le lock ne contenait que les binaires Windows : `npm ci` fabriquait donc, sur les
+exécuteurs Linux et macOS, une installation où Rollup refusait de démarrer. La compilation
+échouait sur GitHub, jamais en local — la panne la plus coûteuse à diagnostiquer.
+
+Les déclarer en dépendances optionnelles **directes** force npm à les inscrire toutes, quelle
+que soit la plateforme. Corollaire : leurs versions doivent suivre celle de Rollup. La CI le
+vérifie (`npm run verifier:binaires`) et échoue avec un message explicite si elles se
+désalignent.
+
+Si vous compilez sur une autre plateforme avec `npm ci` et rencontrez
+`Cannot find module @rollup/rollup-…`, ajoutez le paquet correspondant — par exemple
+`@rollup/rollup-linux-arm64-gnu` sur un Linux ARM — à `optionalDependencies`, à la version
+de Rollup, puis relancez `npm install`.
 
 ---
 

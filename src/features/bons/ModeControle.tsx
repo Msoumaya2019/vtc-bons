@@ -32,8 +32,10 @@ export function ModeControle() {
   const [bon, setBon] = useState<Bon | null>(null);
   const [documents, setDocuments] = useState<DocumentChauffeur[]>([]);
   const [voirAssurances, setVoirAssurances] = useState(false);
+  const [chargement, setChargement] = useState(true);
 
   const charger = useCallback(async () => {
+    setChargement(true);
     const [charge, docs] = await Promise.all([
       db.bons.get(bonId),
       db.documentsChauffeur.orderBy('ordre').toArray(),
@@ -46,6 +48,7 @@ export function ModeControle() {
         ),
       ),
     );
+    setChargement(false);
   }, [bonId]);
 
   useEffect(() => {
@@ -60,7 +63,18 @@ export function ModeControle() {
     return () => document.removeEventListener('keydown', surTouche);
   }, [navigate]);
 
-  if (!bon || !settings) {
+  // Tant que la lecture de la base n'est pas terminée, on ne peut rien affirmer.
+  // Conclure trop vite ferait clignoter « Justificatif introuvable. » sur un écran
+  // destiné à être tendu à un agent : le chauffeur douterait de son propre bon.
+  if (chargement || !settings) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-white p-6 text-slate-900">
+        <p className="text-lg font-semibold">Chargement du justificatif…</p>
+      </div>
+    );
+  }
+
+  if (!bon) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-white p-6 text-slate-900">
         <div className="text-center">

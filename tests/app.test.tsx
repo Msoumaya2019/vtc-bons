@@ -13,17 +13,31 @@ import { App } from '../src/App';
 import { db, effacerToutesLesDonnees, saveSettings } from '../src/lib/db';
 import { bonTest, reglagesTest } from './aides';
 
+/**
+ * Délai d'attente des écrans.
+ *
+ * Volontairement large : ce fichier monte l'application entière, et les douze
+ * fichiers de test s'exécutent en parallèle sur la même machine. Le seuil par
+ * défaut, une seconde, devient insuffisant sous charge — ce qui produisait des
+ * échecs aléatoires sans aucun rapport avec le comportement testé. Ce test ne
+ * mesure pas une vitesse : il vérifie un enchaînement.
+ */
+const DELAI = 5_000;
+
 /** Amène l'application sur une route, puis attend que l'écran correspondant s'affiche. */
 async function attendreEcran(chemin: string, texteAttendu: RegExp | string) {
   window.location.hash = chemin;
-  await screen.findByText(texteAttendu);
+  await screen.findByText(texteAttendu, {}, { timeout: DELAI });
 }
 
 /** L'application chargée : l'écran d'attente doit avoir disparu. */
 async function attendreDemarrage() {
-  await waitFor(() => {
-    expect(screen.queryByText('Ouverture de vos données locales…')).toBeNull();
-  });
+  await waitFor(
+    () => {
+      expect(screen.queryByText('Ouverture de vos données locales…')).toBeNull();
+    },
+    { timeout: DELAI },
+  );
 }
 
 let erreursConsole: string[] = [];
@@ -215,5 +229,50 @@ describe('mode contrôle', () => {
 
     await attendreEcran('#/controle/bon-inexistant', 'Justificatif introuvable.');
     expect(screen.getByRole('button', { name: 'Revenir' })).toBeInTheDocument();
+  });
+
+  it('annonce le chargement avant de conclure à l’absence', async () => {
+    // La lecture de la base est asynchrone. On la retient volontairement, pour
+    // observer l'état intermédiaire : l'écran ne doit pas encore affirmer que le
+    // justificatif est introuvable. Sans cette précaution, l'écran clignoterait
+    // avec un message faux, sous les yeux d'un agent.
+    const lire = db.bons.get.bind(db.bons);
+    let liberer!: () => void;
+    const retenue = new Promise<void>((resoudre) => {
+      liberer = resoudre;
+    });
+    // Dexie déclare `get` avec plusieurs signatures. TypeScript retient la dernière
+    // pour typer le mock, alors que l'application appelle la première — par clé.
+    // D'où cette assertion, cantonnée à ce test.
+    const espion = vi.spyOn(db.bons, 'get').mockImplementation(
+      ((cle: string) =>
+        // On lit réellement, mais on retient la réponse. Chaîner sur la promesse
+        // renvoyée par Dexie conserve son type : un simple `async` renverrait un
+        // `Promise` ordinaire, que la signature de Dexie refuse.
+        lire(cle).then(async (resultat) => {
+          await retenue;
+          return resultat;
+        })) as unknown as typeof db.bons.get,
+    );
+
+    try {
+      render(<App />);
+      await attendreDemarrage();
+
+      window.location.hash = '#/controle/bon-inexistant';
+
+      expect(
+        await screen.findByText('Chargement du justificatif…', {}, { timeout: DELAI }),
+      ).toBeInTheDocument();
+      expect(screen.queryByText('Justificatif introuvable.')).toBeNull();
+
+      liberer();
+
+      expect(
+        await screen.findByText('Justificatif introuvable.', {}, { timeout: DELAI }),
+      ).toBeInTheDocument();
+    } finally {
+      espion.mockRestore();
+    }
   });
 });
