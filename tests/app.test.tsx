@@ -33,13 +33,27 @@ vi.mock('../src/lib/geo', () => geoSimule);
 /**
  * Délai d'attente des écrans.
  *
- * Volontairement large : ce fichier monte l'application entière, et les douze
+ * Volontairement large : ce fichier monte l'application entière, et les quatorze
  * fichiers de test s'exécutent en parallèle sur la même machine. Le seuil par
  * défaut, une seconde, devient insuffisant sous charge — ce qui produisait des
  * échecs aléatoires sans aucun rapport avec le comportement testé. Ce test ne
  * mesure pas une vitesse : il vérifie un enchaînement.
  */
 const DELAI = 5_000;
+
+/**
+ * Délai maximal d'un test de ce fichier.
+ *
+ * Le seuil par défaut, cinq secondes, ne suffit pas ici : chaque test monte
+ * l'application complète, et les exécuteurs de GitHub ne disposent que de deux
+ * cœurs pour quatorze fichiers lancés en parallèle. Dépassé, un test échoue avec un
+ * « timed out » qui ne dit rien du comportement — exactement le genre de panne que ce
+ * fichier a déjà provoquée une fois.
+ *
+ * Relevé pour ce fichier seulement : ailleurs, un test qui s'éternise doit continuer
+ * d'être signalé vite.
+ */
+vi.setConfig({ testTimeout: 20_000 });
 
 /** Amène l'application sur une route, puis attend que l'écran correspondant s'affiche. */
 async function attendreEcran(chemin: string, texteAttendu: RegExp | string) {
@@ -330,16 +344,6 @@ describe('aide à la saisie d’adresse', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Continuer' }, { timeout: DELAI }));
   }
 
-  it('remplit le trajet depuis les propositions d’adresses', async () => {
-    await ouvrirLeTrajet();
-
-    const depart = screen.getByRole('combobox', { name: /Lieu de prise en charge/ });
-    fireEvent.change(depart, { target: { value: 'Pontoise' } });
-    fireEvent.mouseDown(await screen.findByRole('option', {}, { timeout: DELAI }));
-
-    expect(depart).toHaveValue(PONTOISE.libelle);
-  });
-
   it('calcule la distance dès que les deux adresses sont connues', async () => {
     await ouvrirLeTrajet();
 
@@ -351,6 +355,9 @@ describe('aide à la saisie d’adresse', () => {
 
     fireEvent.change(arrivee, { target: { value: 'Roissy' } });
     fireEvent.mouseDown(await screen.findByRole('option', {}, { timeout: DELAI }));
+
+    expect(depart).toHaveValue(PONTOISE.libelle);
+    expect(arrivee).toHaveValue(ROISSY.libelle);
 
     await waitFor(
       () => expect(screen.getByLabelText(/Distance estimée/)).toHaveValue(42.2),

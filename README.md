@@ -181,7 +181,7 @@ Le guide pas à pas, sans ligne de commande, se trouve dans **[SETUP.md](SETUP.m
 
 ## Ce que les tests vérifient
 
-327 tests, répartis en quatorze fichiers. Ils ne mesurent pas la quantité de code, mais les
+326 tests, répartis en quatorze fichiers. Ils ne mesurent pas la quantité de code, mais les
 endroits où une erreur coûte cher.
 
 | Fichier | Ce qu'il protège |
