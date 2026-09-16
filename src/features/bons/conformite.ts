@@ -176,6 +176,23 @@ export function verifierConformiteBon(
       champ: 'lignes',
       message: 'Aucune ligne de prestation : le bon n’indiquera aucun montant.',
     });
+  } else if (bon.lignes.every((ligne) => ligne.prixUnitaireCentimes === 0)) {
+    // Le prix n'est PAS une des sept mentions de l'arrêté : un bon à 0 € est donc
+    // légalement valable, et ce manque ne peut pas être un blocage ici. Il est signalé
+    // tout de même, parce qu'un bon à 0 € reste un document faux — et parce que, dans
+    // le flux manuel, le chauffeur peut légitimement ne pas encore connaître le montant
+    // définitif (attente, péages). Le bloquer l'obligerait à inscrire un prix inventé,
+    // qu'il ne pourrait plus corriger : le bon est figé à l'émission.
+    //
+    // L'onglet Instantané, lui, en fait un BLOCAGE (voir `manquesDuProfil`) : le prix y
+    // vient d'un profil réglé à l'avance, que personne ne relit au moment du geste.
+    // Deux sévérités pour un même fait, parce que deux contextes.
+    problemes.push({
+      niveau: 'avertissement',
+      champ: 'montant',
+      message:
+        'Ce bon ne porte aucun montant : le total serait de 0 €. Vérifiez le prix de la course.',
+    });
   }
 
   return problemes;

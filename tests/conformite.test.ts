@@ -17,7 +17,7 @@ import {
   verifierConformiteFacture,
 } from '../src/features/bons/conformite';
 import { MENTIONS_ARRETE_2025 as MENTIONS_SOURCE } from '../src/lib/mentions';
-import { bonTest, clientTest, factureTest, reglagesTest } from './aides';
+import { bonTest, clientTest, factureTest, ligneTest, reglagesTest } from './aides';
 
 /** Raccourci : vérifie la conformité d'un bon de test. */
 function verifier(surchargeBon = {}, surchargeReglages = {}, client = clientTest()) {
@@ -182,6 +182,22 @@ describe('verifierConformiteBon — avertissements non bloquants', () => {
     const problemes = verifier({ lignes: [] });
     expect(blocages(problemes)).toEqual([]);
     expect(avertissements(problemes).map((p) => p.champ)).toContain('lignes');
+  });
+
+  it('avertit sans bloquer quand le bon ne porte aucun montant', () => {
+    // Le prix n'est pas une des sept mentions : ce manque ne peut donc pas bloquer.
+    // Un bon à 0 € reste pourtant un document faux, et le chauffeur doit pouvoir le
+    // voir avant d'émettre — le bon étant figé, il ne pourrait plus le corriger après.
+    const problemes = verifier({ lignes: [ligneTest({ prixUnitaireCentimes: 0 })] });
+
+    expect(blocages(problemes)).toEqual([]);
+    expect(avertissements(problemes).map((p) => p.champ)).toContain('montant');
+  });
+
+  it('n’avertit pas quand le bon porte un montant', () => {
+    const problemes = verifier({ lignes: [ligneTest({ prixUnitaireCentimes: 10000 })] });
+
+    expect(avertissements(problemes).map((p) => p.champ)).not.toContain('montant');
   });
 
   it('avertit sans bloquer quand le nombre de passagers est absent', () => {

@@ -84,10 +84,14 @@ export function construireBonInstantane(
  *
  * À ne pas confondre avec les mentions de l'arrêté, et la distinction n'est pas
  * cosmétique : un bon à 0 € est un justificatif **légalement valable** — le prix ne
- * figure pas parmi les sept mentions. Le contrôle de conformité ne peut donc pas le
- * refuser, et il ne le fait pas. Il n'en reste pas moins un document FAUX, déjà émis
- * et déjà numéroté, que le chauffeur ne découvrirait qu'en le tendant à son client,
- * devant lui.
+ * figure pas parmi les sept mentions. Le contrôle de conformité ne peut donc pas en
+ * faire un blocage, et il n'en fait qu'un avertissement.
+ *
+ * Ici, le même fait devient un BLOCAGE, parce que le contexte diffère : dans l'onglet
+ * Instantané, le prix vient d'un profil réglé à l'avance, que personne ne relit au
+ * moment du geste. Sans cette sévérité, l'écran annoncerait « Prêt » et l'appui
+ * émettrait un bon numéroté à 0 €, que le chauffeur ne découvrirait qu'en le tendant à
+ * son client, devant lui.
  *
  * C'est le seul manque de cette famille : la destination et le nombre de passagers
  * restent des avertissements, parce qu'un bon sans eux demeure exploitable.

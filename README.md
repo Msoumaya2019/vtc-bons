@@ -205,7 +205,7 @@ Le guide pas à pas, sans ligne de commande, se trouve dans **[SETUP.md](SETUP.m
 
 ## Ce que les tests vérifient
 
-364 tests, répartis en seize fichiers. Ils ne mesurent pas la quantité de code, mais les
+366 tests, répartis en seize fichiers. Ils ne mesurent pas la quantité de code, mais les
 endroits où une erreur coûte cher.
 
 | Fichier | Ce qu'il protège |
@@ -213,7 +213,7 @@ endroits où une erreur coûte cher.
 | `tva.test.ts` | Le calcul HT / TVA / TTC : taux à 10 %, services annexes jamais à 20 %, TVA par taux et non par ligne, franchise, débours, remises réparties au centime près |
 | `money.test.ts` | Conversions et arrondis — aucun calcul monétaire en flottant |
 | `numbering.test.ts` | Séquence continue, sans trou ni doublon, y compris sous vingt appels simultanés |
-| `conformite.test.ts` | Les 7 mentions de l'arrêté, une par une, et le refus d'émettre un bon daté après la course |
+| `conformite.test.ts` | Les 7 mentions de l'arrêté, une par une, le refus d'émettre un bon daté après la course, et l'avertissement sur un bon sans montant — le prix n'étant pas une des 7 mentions, il ne peut pas bloquer, mais un bon à 0 € reste un document faux |
 | `documentData.test.ts` | Le contenu réellement imprimé sur les PDF, mentions comprises |
 | `pdf.test.ts` | Le rendu effectif des PDF : quinze documents réellement produits |
 | `factures.test.ts` | Refus de la double facturation, avoirs, statuts, indicateurs |
