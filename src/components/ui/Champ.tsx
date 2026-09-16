@@ -78,10 +78,17 @@ interface PropsCase {
 }
 
 export function CaseACocher({ label, aide, checked, onChange, id }: PropsCase) {
+  // Un identifiant est indispensable pour relier le libellé à la case. Sans lui, cliquer
+  // sur le texte ne coche rien, et un lecteur d'écran annonce une case sans nom — deux
+  // défauts invisibles à l'œil, mais qui rendent le réglage inutilisable autrement qu'à
+  // la souris. `useId` en fournit un quand l'appelant n'en donne pas : la plupart des
+  // usages n'ont aucune raison d'en inventer un.
+  const idGenere = useId();
+  const identifiant = id ?? idGenere;
   return (
     <div className="flex items-start gap-3 py-1">
       <input
-        id={id}
+        id={identifiant}
         type="checkbox"
         checked={checked}
         onChange={(evenement) => onChange(evenement.target.checked)}
@@ -89,7 +96,10 @@ export function CaseACocher({ label, aide, checked, onChange, id }: PropsCase) {
         style={{ accentColor: 'var(--accent)' }}
       />
       <div>
-        <label htmlFor={id} className="text-sm font-medium text-slate-800 dark:text-slate-100">
+        <label
+          htmlFor={identifiant}
+          className="text-sm font-medium text-slate-800 dark:text-slate-100"
+        >
           {label}
         </label>
         {aide ? <p className="aide-champ">{aide}</p> : null}

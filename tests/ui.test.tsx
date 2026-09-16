@@ -254,6 +254,20 @@ describe('CaseACocher', () => {
     fireEvent.click(screen.getByLabelText('Débours'));
     expect(onChange).toHaveBeenCalledWith(true);
   });
+
+  it('relie le libellé à la case même sans identifiant fourni', () => {
+    // Sans cette liaison, cliquer sur le texte ne coche rien et un lecteur d'écran
+    // annonce une case sans nom. La plupart des appels ne passent aucun identifiant :
+    // c'est au composant d'en fournir un.
+    render(<CaseACocher label="Débours" checked={false} onChange={() => {}} />);
+
+    const caseACocher = screen.getByLabelText('Débours');
+    const identifiant = caseACocher.getAttribute('id');
+
+    expect(identifiant).toBeTruthy();
+    // React écrit `for` dans le DOM, pas `htmlFor`.
+    expect(screen.getByText('Débours')).toHaveAttribute('for', identifiant);
+  });
 });
 
 describe('Bouton', () => {
