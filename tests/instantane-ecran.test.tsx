@@ -264,6 +264,20 @@ describe('PageInstantane', () => {
     );
 
     await waitFor(async () => expect(await db.bons.count()).toBe(1), { timeout: DELAI });
+
+    // On attend l'ABOUTISSEMENT, et pas seulement le compteur.
+    //
+    // `emettreBon` poursuit après l'écriture du brouillon : il numérote, journalise, puis
+    // enregistre — un `put` sur le même identifiant. Un test qui s'arrête au compteur laisse
+    // cette chaîne en vol, et ce `put` final arrive alors APRÈS l'`effacerToutesLesDonnees()`
+    // du test suivant, où il RÉINSÈRE l'enregistrement effacé : `put` est un upsert, pas une
+    // mise à jour conditionnelle.
+    //
+    // Éprouvé par une sonde isolée, puis observé : c'est ce qui faisait apparaître DEUX bons
+    // dans le test du double appui, une fois sur trois en suite entière, alors que l'assertion
+    // directe de ce test — `positionActuelle` appelé une fois — tenait. Attendre la navigation
+    // garantit que toutes les écritures sont terminées avant la fin du test.
+    await screen.findByText('Fiche du bon', {}, { timeout: DELAI });
     expect(geoSimule.positionActuelle).not.toHaveBeenCalled();
   });
   it('ne génère qu’un seul bon si le bouton est touché deux fois d’affilée', async () => {
