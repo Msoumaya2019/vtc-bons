@@ -18,9 +18,13 @@ dist-ssr/
 *.mobileprovision
 *.cer
 
-# Plateformes natives générées par la CI (Capacitor)
-ios/
-android/
+# Plateformes natives générées par la CI (Capacitor).
+# L'ancre « / » n'est pas décorative : sans elle, « android/ » correspondrait à TOUT
+# dossier de ce nom, y compris `native/android/` — où vivent justement les fragments XML
+# que la compilation doit réinjecter dans le projet généré. Ils auraient été écartés du
+# dépôt en silence, et la CI aurait échoué sur un fragment introuvable.
+/ios/
+/android/
 
 # Éditeurs et système
 .vscode/*
@@ -30,3 +34,9 @@ android/
 Thumbs.db
 *.log
 coverage/
+
+# Python — un script de vérification du dossier `scripts/` est en Python, parce qu'il
+# manipule du XML : sans ces deux lignes, l'exécuter laisserait des fichiers compilés
+# dans le dépôt.
+__pycache__/
+*.pyc

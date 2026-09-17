@@ -96,6 +96,24 @@ jobs:
 
           sed -n '1,10p' "$MANIFESTE"
 
+      - name: Déclarer le raccourci d'écran d'accueil et le schéma vtcbons
+        # Un appui long sur l'icône installée doit proposer « Bon instantané », qui ouvre
+        # directement l'onglet correspondant. Ce raccourci ne peut PAS venir du manifeste
+        # web : une application native ne lit pas `manifest.webmanifest`. Il se déclare donc
+        # dans le projet Android, et `android/` étant régénéré à chaque compilation, la
+        # déclaration se refait ici à chaque fois.
+        #
+        # Le travail est confié à un script versionné plutôt qu'écrit dans ce YAML : il
+        # touche trois fichiers, vérifie après coup ce qu'il a écrit, et confronte le
+        # raccourci à l'identifiant d'application réellement compilé. Tout cela se relit
+        # dans `scripts/declarer-raccourci-android.py`, et s'éprouve en le lançant.
+        #
+        # Le raccourci lui-même est validé plus loin, par la compilation Gradle : `aapt2`
+        # refuse un attribut inconnu à l'édition de liens. Le script, lui, se limite à
+        # vérifier que les trois documents restent des XML bien formés — ce qui se voit ici,
+        # et non au milieu d'une compilation Gradle.
+        run: python3 scripts/declarer-raccourci-android.py android
+
       - name: APK de test
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon --stacktrace

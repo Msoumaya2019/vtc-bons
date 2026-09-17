@@ -25,6 +25,7 @@
     "cap:android": "npm run build && cap sync android && cap open android"
   },
   "dependencies": {
+    "@capacitor/app": "^8.1.1",
     "@capacitor/geolocation": "^8.2.2",
     "@react-pdf/renderer": "^4.1.6",
     "dexie": "^4.0.11",

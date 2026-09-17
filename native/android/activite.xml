@@ -1,0 +1,15 @@
+            <!-- Reçoit l'adresse que porte le raccourci, et déclare ce raccourci.
+                 Les deux vont DANS l'activité : un intent-filter posé à côté d'elle ne
+                 serait jamais résolu, et la meta-data doit être portée par l'activité qui
+                 reçoit l'intention. Posés par `scripts/declarer-raccourci-android.py`,
+                 car `android/` est régénéré à chaque compilation. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="vtcbons" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/raccourcis" />

@@ -1,5 +1,6 @@
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Layout } from './components/Layout';
+import { EcouteLienProfond } from './components/EcouteLienProfond';
 import { FournisseurToast } from './components/ui/Toast';
 import { FournisseurReglages, useReglages } from './context/ReglagesContext';
 import { FournisseurClients } from './context/ClientsContext';
@@ -64,6 +65,11 @@ export function App() {
           {/* HashRouter : indispensable pour un déploiement dans un sous-répertoire
               GitHub Pages, où le serveur ne réécrit pas les routes. */}
           <HashRouter>
+            {/* Monté AVANT l'écran d'attente, et non dans les routes : un lien profond
+                est alors traité pendant que la base s'ouvre. Placé plus bas, il
+                arriverait après la redirection de la racine, et le chauffeur verrait
+                apparaître l'assistant de création avant l'onglet qu'il a demandé. */}
+            <EcouteLienProfond />
             <Application />
           </HashRouter>
         </FournisseurClients>

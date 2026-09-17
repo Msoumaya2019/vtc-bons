@@ -1,0 +1,7 @@
+
+    <!-- Libellés du raccourci d'écran d'accueil. `android:shortcutShortLabel` exige une
+         RESSOURCE de chaîne, jamais un texte écrit dans le raccourci : d'où ces deux
+         entrées. Posées par `scripts/declarer-raccourci-android.py`, car `android/` est
+         régénéré à chaque compilation. -->
+    <string name="raccourci_instantane_court">Instantané</string>
+    <string name="raccourci_instantane_long">Bon instantané</string>

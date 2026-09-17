@@ -108,6 +108,80 @@ jobs:
           print("Info.plist valide.")
           PYTHON
 
+      - name: Déclarer le schéma d'adresse vtcbons
+        # Sur iPhone, il n'existe pas de raccourci d'écran d'accueil au sens d'Android : le
+        # chauffeur installe un raccourci de l'application « Raccourcis », qui ouvre une
+        # adresse. Pour qu'iOS accepte de remettre « vtcbons://instantane » à cette
+        # application, le schéma doit être DÉCLARÉ ici. Sans cette déclaration, iOS refuse
+        # d'ouvrir l'adresse et le raccourci ne produit rien, sans le moindre message.
+        #
+        # `CFBundleURLTypes` est absent du modèle de Capacitor : la clé est donc créée.
+        # Comme pour la position, l'écriture se fait ici, car `ios/` est régénéré à chaque
+        # compilation.
+        run: |
+          PLIST=ios/App/App/Info.plist
+          if [ ! -f "$PLIST" ]; then
+            echo "::error::Info.plist introuvable : le projet iOS n'a pas été généré."
+            exit 1
+          fi
+
+          python3 - "$PLIST" <<'PYTHON'
+          import plistlib
+          import sys
+
+          chemin = sys.argv[1]
+          SCHEMA = "vtcbons"
+
+          with open(chemin, "rb") as fichier:
+              contenu = plistlib.load(fichier)
+
+          avant = set(contenu)
+
+          # Une seule entrée : ce schéma sert au raccourci, pas à ouvrir des documents.
+          # `CFBundleURLName` est un identifiant interne, jamais montré au chauffeur ; il
+          # reprend la variable déjà employée par `CFBundleIdentifier`, plutôt que de
+          # recopier l'identifiant de l'application à un second endroit.
+          contenu["CFBundleURLTypes"] = [
+              {
+                  "CFBundleURLName": "$(PRODUCT_BUNDLE_IDENTIFIER)",
+                  "CFBundleURLSchemes": [SCHEMA],
+              }
+          ]
+
+          with open(chemin, "wb") as fichier:
+              plistlib.dump(contenu, fichier)
+
+          # Relecture : une déclaration absente ne se verrait que sur le téléphone, au
+          # moment où le chauffeur appuie sur le raccourci et que rien ne s'ouvre.
+          with open(chemin, "rb") as fichier:
+              relu = plistlib.load(fichier)
+
+          schemas = [
+              schema
+              for type_url in relu.get("CFBundleURLTypes") or []
+              for schema in type_url.get("CFBundleURLSchemes") or []
+          ]
+          if SCHEMA not in schemas:
+              sys.exit(f"::error::le schéma {SCHEMA} n'a pas pu être écrit dans Info.plist.")
+
+          # Cette étape et celle de la position écrivent dans le MÊME fichier : la seconde
+          # ne doit rien effacer de ce qu'a posé la première. Un réglage perdu ne se verrait
+          # qu'au premier appui sur « Ma position », sur le téléphone, après coup.
+          perdues = avant - set(relu)
+          if perdues:
+              sys.exit(f"::error::clés perdues dans Info.plist : {', '.join(sorted(perdues))}")
+
+          for cle in (
+              "NSLocationWhenInUseUsageDescription",
+              "NSLocationAlwaysAndWhenInUseUsageDescription",
+          ):
+              if not relu.get(cle):
+                  sys.exit(f"::error::{cle} n'est plus renseignée dans Info.plist.")
+
+          print(f"Schémas d'adresse déclarés : {', '.join(schemas)}")
+          print("Info.plist valide.")
+          PYTHON
+
       - name: Compiler sans signature
         working-directory: ios/App
         run: |

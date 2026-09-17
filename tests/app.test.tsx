@@ -31,6 +31,24 @@ const geoSimule = vi.hoisted(() => ({
 vi.mock('../src/lib/geo', () => geoSimule);
 
 /**
+ * Lien profond simulé.
+ *
+ * Le greffon `@capacitor/app` n'existe que dans l'enveloppe native : en test, c'est lui
+ * qui apporte l'adresse par laquelle l'application a été ouverte. Le remplacer permet
+ * d'éprouver le seul comportement qui compte — l'application ouvre-t-elle le bon onglet
+ * quand elle est lancée par son raccourci.
+ *
+ * `addListener` rend une promesse : c'est la signature réelle du greffon, et l'oublier
+ * ferait passer un test qui ne ressemble pas à l'application.
+ */
+const appSimulee = vi.hoisted(() => ({
+  getLaunchUrl: vi.fn(),
+  addListener: vi.fn(),
+}));
+
+vi.mock('@capacitor/app', () => ({ App: appSimulee }));
+
+/**
  * Délai d'attente des écrans.
  *
  * Volontairement large : ce fichier monte l'application entière, et les quatorze
@@ -134,6 +152,12 @@ beforeEach(async () => {
   // Le bloc « aide à la saisie d'adresse » ci-dessous remplace ces valeurs par les siennes.
   geoSimule.chercherAdresses.mockResolvedValue([]);
   geoSimule.calculerDistance.mockResolvedValue(null);
+
+  // Valeurs par défaut du lien profond : aucune adresse de lancement, et un écouteur
+  // qui rend un objet conforme au greffon. Un `vi.fn()` nu rendrait `undefined`, et
+  // l'application appellerait `.remove()` dessus.
+  appSimulee.getLaunchUrl.mockResolvedValue(undefined);
+  appSimulee.addListener.mockResolvedValue({ remove: vi.fn() });
 
   // React signale dans la console toute erreur de rendu ou de prop. Un démarrage propre
   // ne doit rien y écrire : ce contrôle attrape les défauts qu'aucune assertion ne
@@ -357,6 +381,99 @@ describe('routes', () => {
       await screen.findByText('Aucun profil instantané', {}, { timeout: DELAI }),
     ).toBeInTheDocument();
     expect(screen.queryByText('Nouveau bon de commande')).toBeNull();
+  });
+});
+
+describe('lien profond', () => {
+  /** Simule l'application native, ouverte par une adresse — ou par aucune. */
+  function lancerParAdresse(url?: string) {
+    window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' };
+    appSimulee.getLaunchUrl.mockResolvedValue(url === undefined ? undefined : { url });
+  }
+
+  it('ouvre l’onglet Instantané quand l’application est lancée par son raccourci', async () => {
+    // C'est tout ce qu'un raccourci d'écran d'accueil sait faire : ouvrir l'application
+    // à un endroit donné. S'il n'ouvre pas l'onglet, le chauffeur traverse l'assistant
+    // de création devant un client qui attend — précisément ce qu'il voulait éviter.
+    lancerParAdresse('vtcbons://instantane');
+
+    render(<App />);
+    await attendreDemarrage();
+
+    // L'adresse d'abord : c'est le signal le plus direct. Un échec ici dit « attendu
+    // #/instantane, trouvé #/nouveau », là où une attente d'écran expirerait après dix
+    // secondes sans rien apprendre.
+    await waitFor(() => expect(window.location.hash).toBe('#/instantane'), { timeout: DELAI });
+
+    // Puis un texte propre à l'onglet : « Instantané » figure aussi dans la barre
+    // d'onglets, donc l'attendre ne prouverait pas que l'écran correspondant est ouvert.
+    expect(
+      await screen.findByText('Aucun profil instantané', {}, { timeout: DELAI }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Nouveau bon de commande')).toBeNull();
+
+    // Un seul abonnement, et une seule interrogation du natif. Un effet qui se rejoue à
+    // chaque navigation poserait un écouteur DE PLUS à chaque changement d'écran — une
+    // fuite silencieuse, et un même lien traité plusieurs fois. Relevé en éprouvant ce
+    // test par mutation : `getLaunchUrl` était alors appelé deux fois pour un démarrage.
+    expect(appSimulee.getLaunchUrl).toHaveBeenCalledTimes(1);
+    expect(appSimulee.addListener).toHaveBeenCalledTimes(1);
+  });
+
+  it('n’ouvre rien quand le lien ne vise aucune cible connue', async () => {
+    lancerParAdresse('vtcbons://onglet-qui-nexiste-pas');
+
+    render(<App />);
+    await attendreDemarrage();
+
+    expect(
+      await screen.findByText('Nouveau bon de commande', {}, { timeout: DELAI }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Aucun profil instantané')).toBeNull();
+  });
+
+  it('suit un lien reçu alors que l’application est déjà ouverte', async () => {
+    lancerParAdresse();
+    let ouvrir!: (evenement: { url: string }) => void;
+    appSimulee.addListener.mockImplementation(
+      async (_nom: string, ecouteur: (evenement: { url: string }) => void) => {
+        ouvrir = ecouteur;
+        return { remove: vi.fn() };
+      },
+    );
+
+    render(<App />);
+    await attendreDemarrage();
+    await attendreEcran('#/bons', 'Aucun bon de commande');
+
+    // Le système relance l'application sur place : c'est le second cas, et il ne passe
+    // pas par `getLaunchUrl`.
+    ouvrir({ url: 'vtcbons://instantane' });
+
+    await waitFor(() => expect(window.location.hash).toBe('#/instantane'), { timeout: DELAI });
+    expect(
+      await screen.findByText('Aucun profil instantané', {}, { timeout: DELAI }),
+    ).toBeInTheDocument();
+  });
+
+  it('ne fait rien dans un navigateur, où aucun lien profond n’arrive', async () => {
+    // `window.Capacitor` a été retiré par le `beforeEach` : nous sommes dans un
+    // navigateur. Le greffon répondrait pourtant « instantané », et c'est ce qui rend ce
+    // test utile : sans la garde, une adresse native détournerait aussi la version web.
+    appSimulee.getLaunchUrl.mockResolvedValue({ url: 'vtcbons://instantane' });
+
+    render(<App />);
+    await attendreDemarrage();
+
+    // Le greffon d'abord : c'est l'assertion qui échoue le plus tôt et le plus
+    // clairement. Le composant est monté et son effet a déjà été exécuté — l'application
+    // est dans un navigateur, il n'a donc aucune raison d'interroger le natif.
+    expect(appSimulee.getLaunchUrl).not.toHaveBeenCalled();
+
+    expect(
+      await screen.findByText('Nouveau bon de commande', {}, { timeout: DELAI }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Aucun profil instantané')).toBeNull();
   });
 });
 

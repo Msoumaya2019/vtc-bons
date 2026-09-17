@@ -36,7 +36,8 @@ prise en charge enregistré dans le profil est utilisé, et l'application vous l
 est émis dans les deux cas.
 
 Un raccourci d'écran d'accueil ouvre cet onglet directement, sans traverser l'assistant :
-voir « Raccourci d'écran d'accueil », plus bas.
+appui long sur l'icône de l'application installée, ou raccourci du navigateur. Voir
+« Raccourci d'écran d'accueil », plus bas.
 
 **L'adresse assistée.** Vous tapez les premières lettres du lieu de prise en charge : les
 propositions s'affichent, comme sur une carte. Un bouton **« Ma position »** remplit
@@ -209,7 +210,7 @@ Le guide pas à pas, sans ligne de commande, se trouve dans **[SETUP.md](SETUP.m
 
 ## Ce que les tests vérifient
 
-389 tests, répartis en dix-sept fichiers. Ils ne mesurent pas la quantité de code, mais les
+403 tests, répartis en dix-huit fichiers. Ils ne mesurent pas la quantité de code, mais les
 endroits où une erreur coûte cher.
 
 | Fichier | Ce qu'il protège |
@@ -226,7 +227,8 @@ endroits où une erreur coûte cher.
 | `champ-adresse.test.tsx` | Le champ d'adresse : choix d'une proposition, parcours au clavier, et Échap qui referme la liste **sans** fermer la fenêtre qui l'abrite |
 | `instantane.test.ts` | Le bon instantané : conversion du prix TTC en HT (sans quoi le client paierait la TVA deux fois), repli sur l'adresse du profil quand la position manque, refus d'un profil sans prix (un bon à 0 € est légalement valable — le contrôle de conformité ne peut donc pas l'attraper), et surtout l'absence de brouillon laissé derrière un échec |
 | `instantane-ecran.test.tsx` | L'onglet Instantané : profil incomplet annoncé **avant** l'appui, génération en un clic, réserve qui reste affichée, et relecture d'une fiche client enregistrée avant cette fonctionnalité |
-| `app.test.tsx` | Le démarrage réel de l'application : montage, routage, charte, mode contrôle, et le repère de version des Réglages — sans lui, un essai sur le téléphone ne dit pas quelle version a été essayée. Vérifie aussi la saisie des montants : un champ qui réécrit sa valeur à chaque frappe se réécrit sous le doigt, le curseur repart à la fin et un chiffre tapé après la virgule ne change rien — invisible au clavier d'un ordinateur, systématique sur un téléphone. Vérifie enfin l'ouverture **directe** sur un onglet, sans passer par la racine : c'est tout ce que sait faire un raccourci d'écran d'accueil, et la route « * » ramènerait sinon vers l'assistant de création sans le moindre message |
+| `lienProfond.test.ts` | La traduction d'une adresse `vtcbons://…` vers un onglet — et surtout ses **refus** : un autre schéma, une cible inconnue, une adresse illisible ou absente ne doivent ouvrir **rien**. Un repli sur l'assistant de création ouvrirait le mauvais écran, sans le dire, au moment précis où le chauffeur croit tenir son bon instantané |
+| `app.test.tsx` | Le démarrage réel de l'application : montage, routage, charte, mode contrôle, et le repère de version des Réglages — sans lui, un essai sur le téléphone ne dit pas quelle version a été essayée. Vérifie aussi la saisie des montants : un champ qui réécrit sa valeur à chaque frappe se réécrit sous le doigt, le curseur repart à la fin et un chiffre tapé après la virgule ne change rien — invisible au clavier d'un ordinateur, systématique sur un téléphone. Vérifie enfin l'ouverture **directe** sur un onglet, sans passer par la racine : c'est tout ce que sait faire un raccourci d'écran d'accueil, et la route « * » ramènerait sinon vers l'assistant de création sans le moindre message. Et la réception d'un lien profond : au démarrage, quand l'application est déjà ouverte — et **jamais** dans un navigateur, où aucun lien n'arrive |
 | `format.test.ts`, `validation.test.ts`, `ui.test.tsx` | Dates en heure locale, identifiants administratifs, composants d'interface — dont la saisie d'un montant : champ vide quand le montant est nul, texte conservé tel qu'il est tapé, contenu sélectionné au focus, et saisie illisible gardée à l'écran plutôt que remplacée |
 | `navigation-jsdom.test.tsx` | Le comportement de l'environnement de test sur lequel repose la navigation des autres tests — il n'éprouve pas l'application. Il fixe le fait qu'une écriture dans l'adresse est appliquée **tout de suite** mais n'avertit le routeur que **plus tard**, si bien qu'un remplacement d'adresse survenu entre-temps est celui que le routeur suivra. C'est ce qui faisait naviguer un test vers une route et le laissait sur une autre, sans message |
 
@@ -274,7 +276,7 @@ Trois principes structurent le code :
   un PDF déjà émis.
 - **Le moteur PDF n'est pas chargé au démarrage.** La bibliothèque de mise en page est
   isolée dans son propre morceau et n'est téléchargée qu'au premier document généré ou
-  affiché : le démarrage ne pèse que **142 ko compressés** au lieu de 584 ko. Le service
+  affiché : le démarrage ne pèse que **143 ko compressés** au lieu de 584 ko. Le service
   worker la précache malgré tout, donc elle reste disponible hors connexion.
 
 ---
@@ -315,8 +317,16 @@ dont le bouton « Ma position » échouerait silencieusement.
 
 ### Raccourci d'écran d'accueil
 
-L'application déclare un raccourci : un **appui long sur l'icône installée** propose
-« Bon instantané », qui ouvre directement l'onglet, sans traverser l'assistant de création.
+L'application sait ouvrir **directement l'onglet Instantané** à partir d'une adresse
+`vtcbons://instantane`. Deux mécanismes distincts l'exploitent, selon le support.
+
+| Support | Ce qui fonctionne |
+| --- | --- |
+| **Application Android installée** (APK) | **Appui long sur l'icône** propose « Bon instantané » |
+| **Application iPhone installée** (IPA) | Un raccourci de l'application **Raccourcis**, posé sur l'écran d'accueil |
+| Site ajouté à l'écran d'accueil depuis Chrome Android | Appui long sur l'icône : raccourci du manifeste |
+| Chrome et Edge de bureau, 96 et suivants | Raccourci proposé dans le menu de l'application |
+| **iPhone et iPad, depuis Safari** | **Rien** : Safari ne connaît pas les raccourcis du manifeste |
 
 **Un raccourci n'émet pas le bon.** Il ne peut qu'ouvrir l'application au bon endroit : le
 geste sur le client reste à faire. Ce n'est pas une limite de cette application, mais de la
@@ -326,20 +336,31 @@ désigner un client. Le bon ne peut donc pas exister sans le geste du chauffeur 
 préférable, puisqu'un numéro est consommé à chaque émission et que la séquence ne doit pas
 comporter de trou.
 
-| Plateforme | Ce qui fonctionne |
-| --- | --- |
-| Android, Chrome 84 et suivants | Appui long sur l'icône installée |
-| Chrome et Edge de bureau, 96 et suivants | Raccourci proposé dans le menu de l'application |
-| **iPhone et iPad** | **Rien** : Safari ne connaît pas les raccourcis du manifeste |
-| Applications natives (APK, IPA) | Rien non plus : elles ne lisent pas ce manifeste |
+#### Sur l'application installée
 
-Sur iPhone, la seule voie est de créer le raccourci soi-même, avec l'application
-**Raccourcis** et l'action « Ouvrir des URL ». L'adresse à employer est affichée tout en bas
-des Réglages, sous la version : une application ajoutée à l'écran d'accueil depuis le
-navigateur n'affiche aucune barre d'adresse, et le dièse est précisément la partie qu'on ne
-peut pas deviner. Cette ouverture passe par Safari plutôt que par l'application installée. Le
-stockage de WebKit étant rattaché à l'origine et non à l'application — le quota est le même
-dans les deux cas — les données devraient s'y retrouver ; à confirmer sur l'appareil.
+Les deux raccourcis natifs reposent sur le même mécanisme : un **lien profond**, c'est-à-dire
+une adresse que le système remet à l'application. Le schéma `vtcbons` est déclaré dans
+l'`intent-filter` de `AndroidManifest.xml` et dans `CFBundleURLTypes` de `Info.plist` ; le
+raccourci Android lui-même dans `res/xml/raccourcis.xml`.
+
+`android/` et `ios/` n'étant pas versionnés, ces déclarations sont reposées à chaque
+compilation. Les fragments XML vivent dans `native/android/`, et
+`scripts/declarer-raccourci-android.py` les pose, puis relit ce qu'il a écrit. Il confronte
+aussi `android:targetPackage` et `android:targetClass` à l'`applicationId` réellement compilé :
+les désaccorder produirait un raccourci qui n'ouvre **rien**, sans la moindre erreur de
+compilation.
+
+Sur iPhone, il n'existe pas de raccourci d'écran d'accueil au sens d'Android. Vous créez le
+vôtre, une fois : application **Raccourcis**, action « Ouvrir des URL », adresse
+`vtcbons://instantane`, puis « Ajouter à l'écran d'accueil ».
+
+#### Dans le navigateur
+
+Le manifeste déclare le même raccourci, que Chrome Android et les navigateurs de bureau
+proposent dans le menu de l'application. L'adresse à employer pour un raccourci manuel est
+affichée tout en bas des Réglages, sous la version : une application ajoutée à l'écran
+d'accueil n'affiche aucune barre d'adresse, et le dièse est précisément la partie qu'on ne
+peut pas deviner.
 
 Cette adresse n'est affichée **que dans le navigateur**. Dans les applications natives, elle
 désignerait `https://localhost` ou `capacitor://localhost`, une origine qui ne résout que de
@@ -347,19 +368,26 @@ l'intérieur de l'application : un raccourci bâti dessus ne s'ouvrirait pas. Le
 natives ne lisant pas le manifeste non plus, il n'y a rien à y proposer — et donc rien à y
 montrer.
 
-La compilation vérifie ce raccourci (`npm run verifier:raccourci`) en lisant le manifeste
-**réellement publié**, et refuse une adresse hors de la portée déclarée, une adresse sans
-dièse, ou un onglet qui n'existe pas dans `src/App.tsx`. Sans ce contrôle, un raccourci mal
-formé serait écarté en silence par le navigateur, et le défaut n'apparaîtrait que sur le
-téléphone, devant un client qui attend.
+#### Ce qui est vérifié, et ce qui ne peut l'être que sur le téléphone
+
+À la compilation : le raccourci du manifeste est relu dans le fichier **réellement publié**
+(`npm run verifier:raccourci`), qui refuse une adresse hors de la portée déclarée, une adresse
+sans dièse, ou un onglet absent de `src/App.tsx` ; les fragments natifs sont validés comme XML
+et confrontés à l'identifiant d'application ; et la traduction d'une adresse vers un onglet est
+couverte par des tests, refus compris.
+
+Sur le téléphone, en revanche, trois choses ne peuvent être constatées que par vous : que le
+raccourci apparaît bien à l'appui long, que l'application s'ouvre sur l'onglet Instantané, et
+que le geste se fait d'un seul doigt. Aucune compilation ne les remplace.
 
 ---
 
 ## Sécurité et dépendances
 
-Le code livré aux utilisateurs ne dépend que de sept bibliothèques :
-`react`, `react-dom`, `react-router-dom`, `dexie`, `fflate`, `@react-pdf/renderer` et
-`@capacitor/geolocation`. **Aucune d'elles ne présente de vulnérabilité connue** :
+Le code livré aux utilisateurs ne dépend que de huit bibliothèques :
+`react`, `react-dom`, `react-router-dom`, `dexie`, `fflate`, `@react-pdf/renderer`,
+`@capacitor/geolocation` et `@capacitor/app`. **Aucune d'elles ne présente de vulnérabilité
+connue** :
 
 ```bash
 npm audit --omit=dev   # → found 0 vulnerabilities

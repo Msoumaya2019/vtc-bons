@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Raccourci d'écran d'accueil Android : un appui long sur l'icône installée propose
+  « Bon instantané », qui ouvre directement l'onglet correspondant.
+
+  Recopié par `scripts/declarer-raccourci-android.py` dans
+  `android/app/src/main/res/xml/raccourcis.xml`, car `android/` n'est pas versionné et est
+  régénéré à chaque compilation. Le garder ici, hors du YAML, permet de le relire et de le
+  faire valider par le compilateur Android sans toucher au flux de travail.
+
+  Trois points sur lesquels ce fichier ne peut pas être « simplifié » :
+
+  - `android:shortcutId` est un identifiant LITTÉRAL, jamais une ressource de chaîne ;
+  - `android:shortcutShortLabel` et `shortcutLongLabel`, à l'inverse, DOIVENT être des
+    ressources de chaîne — d'où les deux chaînes de `chaines.xml` ;
+  - `android:data` porte l'adresse que l'application recevra. C'est le seul attribut qui
+    permette de transmettre une adresse à un raccourci statique, et c'est lui que le
+    greffon Capacitor relit. Sa validité a été établie en compilant ce fichier avec
+    `aapt2` : un attribut inconnu y est refusé à l'édition de liens.
+
+  `android:targetPackage` et `android:targetClass` sont écrits en dur ici, alors que
+  l'identifiant de l'application vient de `capacitor.config.ts`. Les changer ici sans les
+  changer là produirait un raccourci qui n'ouvre RIEN, sans erreur de compilation. C'est
+  pourquoi le script confronte ces deux valeurs au `build.gradle` réellement généré.
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="bon_instantane"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/raccourci_instantane_court"
+        android:shortcutLongLabel="@string/raccourci_instantane_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="fr.vtcbons.app"
+            android:targetClass="fr.vtcbons.app.MainActivity"
+            android:data="vtcbons://instantane" />
+    </shortcut>
+</shortcuts>
