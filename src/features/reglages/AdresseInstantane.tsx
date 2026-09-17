@@ -102,7 +102,13 @@ export function AdresseInstantane() {
         <Bouton
           petit
           onClick={() => void copier()}
-          icone={etat === 'copiee' ? <IconeCheck className="h-4 w-4" /> : <IconeCopier className="h-4 w-4" />}
+          icone={
+            etat === 'copiee' ? (
+              <IconeCheck className="h-4 w-4" />
+            ) : (
+              <IconeCopier className="h-4 w-4" />
+            )
+          }
           data-testid="copier-adresse"
         >
           {etat === 'copiee' ? 'Copiée' : 'Copier'}
@@ -111,8 +117,8 @@ export function AdresseInstantane() {
 
       {etat === 'echec' ? (
         <p className="texte-muet mt-2">
-          La copie n’a pas fonctionné. Maintenez le doigt sur l’adresse pour la sélectionner,
-          puis choisissez « Copier ».
+          La copie n’a pas fonctionné. Maintenez le doigt sur l’adresse pour la sélectionner, puis
+          choisissez « Copier ».
         </p>
       ) : null}
 
