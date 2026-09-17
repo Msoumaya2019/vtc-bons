@@ -26,6 +26,8 @@
  */
 
 import { adresseDepuisPosition, messageEchecPosition, positionActuelle } from '../../lib/geo';
+import { minutesAntedatation } from '../../lib/antedatation';
+import { dateLocaleISO, heureLocale } from '../../lib/format';
 import { htDepuisTTC } from '../../lib/tva';
 import { blocages, verifierConformiteBon } from './conformite';
 import type { Probleme } from './conformite';
@@ -39,11 +41,15 @@ import type { Bon, Client, Settings } from '../../types';
  * position du chauffeur peut le remplacer au dernier moment, et c'est précisément
  * cette substitution qui est la raison d'être de l'onglet.
  *
- * Les dates de réservation et de prise en charge valent toutes deux l'instant
- * présent. La réservation n'est donc PAS antérieure à la prise en charge, elle lui
- * est égale — ce que le contrôle accepte. C'est la vérité de ce geste : le bon est
- * établi au moment où le client monte. Il doit donc être généré à ce moment-là, et
- * non après la course : un justificatif daté d'après la course ne prouve rien.
+ * LA PRISE EN CHARGE VAUT L'INSTANT PRÉSENT, ET LA RÉSERVATION PEUT LE PRÉCÉDER. Le bon
+ * est établi au moment où le client monte — c'est la vérité de ce geste, et il doit donc
+ * être généré à ce moment-là, non après la course. Mais la réservation, elle, a eu lieu
+ * avant : le client a appelé, puis le chauffeur est arrivé. Le réglage
+ * `antedatationReservationMinutes` permet de l'enregistrer tel qu'il s'est produit.
+ *
+ * Seule la réservation recule, jamais la prise en charge : reculer les deux laisserait
+ * les dates ÉGALES, et le justificatif serait aussi faible qu'avant, simplement daté
+ * plus tôt. Le raisonnement complet est dans `src/lib/antedatation.ts`.
  */
 export function construireBonInstantane(
   client: Client,
@@ -51,11 +57,22 @@ export function construireBonInstantane(
   lieuPriseEnCharge: string,
 ): Bon {
   const profil = client.instantane;
-  const base = bonVide(settings, client);
+  const maintenant = new Date();
+  // Un seul instant gouverne les trois dates du bon : la création et la prise en charge
+  // restent à l'instant du geste, et la réservation s'en déduit.
+  const base = bonVide(settings, client, maintenant);
   const ligne = ligneVide(settings);
+
+  const recul = minutesAntedatation(settings.antedatationReservationMinutes);
+  // Le recul est appliqué à un instant, pas à une chaîne : la date et l'heure sont
+  // ensuite relues sur cet instant. Une soustraction faite sur l'heure seule donnerait
+  // « -00:15 » pour un bon établi à 00:05, et la veille serait perdue.
+  const reservation = new Date(maintenant.getTime() - recul * 60_000);
 
   return {
     ...base,
+    dateReservation: dateLocaleISO(reservation),
+    heureReservation: heureLocale(reservation),
     lieuPriseEnCharge,
     destination: profil.destination,
     distanceKm: profil.distanceKm,

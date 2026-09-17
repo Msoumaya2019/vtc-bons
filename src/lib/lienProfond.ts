@@ -28,6 +28,17 @@ const CIBLES: Readonly<Record<string, string>> = {
 };
 
 /**
+ * L'adresse que le chauffeur recopie dans l'application Raccourcis d'iOS.
+ *
+ * Elle est écrite en clair, et non reconstruite à partir de `CIBLES` : c'est cette
+ * chaîne exacte qui sera saisie sur le téléphone, et une reconstruction donnerait
+ * l'illusion d'une garantie que le geste du chauffeur ne respecte pas. Le lien entre les
+ * deux est en revanche éprouvé par un test, qui vérifie que cette adresse ouvre bien
+ * l'onglet Instantané — sans quoi un raccourci s'ouvrirait sur rien.
+ */
+export const ADRESSE_INSTANTANE = `${SCHEMA_LIEN_PROFOND}://instantane`;
+
+/**
  * L'onglet visé par une adresse de lien profond, ou `null` si elle ne vient pas de
  * l'application, ou ne vise aucune cible connue.
  *

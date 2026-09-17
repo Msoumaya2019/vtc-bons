@@ -8,9 +8,10 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { App } from '../src/App';
 import { db, effacerToutesLesDonnees, getSettings, saveSettings } from '../src/lib/db';
+import { ANTEDATATIONS_PROPOSEES } from '../src/lib/antedatation';
 import { bonTest, reglagesTest } from './aides';
 
 /**
@@ -309,7 +310,30 @@ describe('routes', () => {
     expect(repere).toHaveTextContent(/^Version du \d{2}\/\d{2}\/\d{4} \([0-9a-f]{7,}\)$/);
   });
 
-  it('affiche l’adresse directe de l’onglet Instantané, seul recours sur iPhone', async () => {
+  it('propose le lien profond dans l’application native, où l’adresse du site ne résoudrait nulle part', async () => {
+    // Dans l'application native, l'origine n'est pas celle du site mais celle de la fenêtre
+    // interne : « https://localhost » sur Android, « capacitor://localhost » sur iOS. Une
+    // telle adresse ne s'ouvre que depuis l'intérieur de l'application — le chauffeur qui en
+    // ferait un raccourci créerait un raccourci mort.
+    //
+    // Ce bloc était pourtant ENTIÈREMENT masqué ici, au motif qu'il n'y avait rien à
+    // proposer. C'était vrai du manifeste, et faux du lien profond : la déclaration native
+    // existait, mais son adresse n'était écrite nulle part dans l'application, si bien que
+    // le raccourci iOS — qui se construit à la main dans l'application Raccourcis — ne
+    // pouvait pas être renseigné. On vérifie donc que c'est bien le lien profond qui
+    // s'affiche, et non l'adresse du site : la différence est tout l'objet du test.
+    window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'ios' };
+
+    render(<App />);
+    await attendreDemarrage();
+    await attendreEcran('#/reglages', 'Réglages');
+
+    const adresse = await screen.findByTestId('adresse-raccourci', {}, { timeout: DELAI });
+    expect(adresse).toHaveTextContent(/^vtcbons:\/\/instantane$/);
+    expect(adresse).not.toHaveTextContent(/#\/instantane/);
+  });
+
+  it('propose l’adresse du site dans le navigateur, et permet de la copier', async () => {
     // Safari sur iOS ne connaît pas les raccourcis déclarés dans le manifeste : la seule
     // voie qui reste est de créer soi-même un raccourci vers l'adresse de l'onglet. Or une
     // application installée n'affiche aucune barre d'adresse — c'est donc ici, et nulle
@@ -322,29 +346,54 @@ describe('routes', () => {
     // On vérifie la FIN de l'adresse : l'origine et le sous-répertoire dépendent du
     // déploiement, alors que l'onglet est la partie qui doit rester stable.
     expect(adresse).toHaveTextContent(/#\/instantane$/);
+    expect(adresse).not.toHaveTextContent(/^vtcbons:/);
+    expect(screen.getByTestId('copier-adresse')).toBeInTheDocument();
   });
 
-  it('ne propose pas cette adresse dans l’application native, où elle ne résoudrait nulle part', async () => {
-    // Dans l'application native, l'origine n'est pas celle du site mais celle de la fenêtre
-    // interne : « https://localhost » sur Android, « capacitor://localhost » sur iOS. Une
-    // telle adresse ne s'ouvre que depuis l'intérieur de l'application — le chauffeur qui en
-    // ferait un raccourci créerait un raccourci mort. Or les applications natives ne lisent
-    // pas le manifeste non plus : il n'y a rien à y proposer, donc rien à y montrer.
-    window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'ios' };
-
+  it('permet de régler l’antédatation de la réservation, et l’enregistre', async () => {
+    // Le champ est la seule voie par laquelle le chauffeur peut régler ce décalage. Sans
+    // lui, le comportement reste celui d'origine — réservation et prise en charge à la
+    // même heure — et le justificatif ne prouve rien de plus que lui-même.
+    //
+    // Les réglages sont posés AVANT le rendu, comme dans le test de l'aide à la saisie :
+    // les valeurs par défaut ont un SIREN et un numéro REVTC vides, si bien que
+    // l'enregistrement serait refusé et que le test échouerait pour une raison qui n'a
+    // rien à voir avec ce qu'il vérifie.
+    await saveSettings(reglagesTest());
     render(<App />);
     await attendreDemarrage();
     await attendreEcran('#/reglages', 'Réglages');
 
-    // L'ordre de ces deux assertions fait toute la valeur du test. « Réglages » figure AUSSI
-    // dans la barre d'onglets : l'attendre ne prouve pas que la page est chargée, et une
-    // assertion d'absence lue à cet instant passerait parce que RIEN n'est encore rendu — y
-    // compris sur un code fautif. On attend donc d'abord un repère propre à la page, et
-    // seulement ensuite on constate l'absence.
-    expect(
-      await screen.findByTestId('version-application', {}, { timeout: DELAI }),
-    ).toBeInTheDocument();
-    expect(screen.queryByTestId('adresse-raccourci')).toBeNull();
+    // La section est repliée au départ, et son contenu n'est donc PAS rendu : on l'ouvre
+    // comme le ferait le chauffeur, plutôt que de chercher un champ qui n'existe pas
+    // encore dans le document.
+    const section = await screen.findByRole(
+      'button',
+      { name: /Antédater la réservation/ },
+      { timeout: DELAI },
+    );
+    expect(section).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(section);
+
+    const choix = await screen.findByTestId('antedatation-reservation', {}, { timeout: DELAI });
+    expect(choix).toHaveValue('0');
+    expect(within(choix).getAllByRole('option')).toHaveLength(ANTEDATATIONS_PROPOSEES.length);
+    // Les deux extrémités de l'échelle, et pas seulement leur nombre : « Aucune » est ce
+    // qui permet de revenir au comportement d'origine, et « 2 heures » la borne haute.
+    expect(within(choix).getByRole('option', { name: 'Aucune' })).toBeInTheDocument();
+    expect(within(choix).getByRole('option', { name: '2 heures' })).toBeInTheDocument();
+
+    fireEvent.change(choix, { target: { value: '30' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    // On attend la valeur RELUE DEPUIS LA BASE, et non un texte de l'écran : c'est la
+    // seule preuve que le réglage a réellement été écrit, et non seulement affiché.
+    await waitFor(
+      async () => {
+        expect((await getSettings()).antedatationReservationMinutes).toBe(30);
+      },
+      { timeout: DELAI },
+    );
   });
 
   it('ouvre l’aide et la conformité', async () => {

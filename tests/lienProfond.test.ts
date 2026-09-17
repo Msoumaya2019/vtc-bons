@@ -9,7 +9,26 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { ongletDepuisLien } from '../src/lib/lienProfond';
+import { ADRESSE_INSTANTANE, SCHEMA_LIEN_PROFOND, ongletDepuisLien } from '../src/lib/lienProfond';
+
+describe('ADRESSE_INSTANTANE', () => {
+  it('ouvre bien l’onglet Instantané', () => {
+    // Cette adresse est recopiée à la main par le chauffeur dans l'application Raccourcis
+    // d'iOS, et la liste blanche de `ongletDepuisLien` est ce qui la reconnaît. Les deux
+    // sont écrites séparément, et ce test est le seul lien entre elles : sans lui, une
+    // faute de frappe d'un côté ferait un raccourci qui ouvre l'application sans rien
+    // faire — sans aucun message d'erreur, et sans que rien ne le signale.
+    expect(ongletDepuisLien(ADRESSE_INSTANTANE)).toBe('/instantane');
+  });
+
+  it('porte le schéma déclaré dans les projets natifs', () => {
+    // Le schéma est écrit en trois endroits qui ne se voient pas entre eux :
+    // l'`intent-filter` d'AndroidManifest.xml, les CFBundleURLTypes d'Info.plist, et ici.
+    // Un désaccord entre les deux premiers est contrôlé par le flux de travail ; celui-ci
+    // l'est par ce test.
+    expect(ADRESSE_INSTANTANE.startsWith(`${SCHEMA_LIEN_PROFOND}://`)).toBe(true);
+  });
+});
 
 describe('ongletDepuisLien', () => {
   it('reconnaît la cible dans l’hôte, forme « vtcbons://instantane »', () => {

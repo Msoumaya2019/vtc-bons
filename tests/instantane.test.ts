@@ -16,7 +16,7 @@
  * logique testée ici. Le service d'adresses est remplacé de la même façon.
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/lib/pdf/generate', () => ({
   genererEtStockerPdfBon: vi.fn(async () => null),
@@ -48,6 +48,7 @@ import {
 } from '../src/features/bons/instantane';
 import { blocages, verifierConformiteBon } from '../src/features/bons/conformite';
 import { ErreurConformite } from '../src/features/bons/service';
+import { horodatage } from '../src/lib/format';
 import { clientInstantaneTest, clientTest, profilInstantane, reglagesTest } from './aides';
 import type { Adresse } from '../src/lib/geo';
 
@@ -70,6 +71,16 @@ beforeEach(async () => {
   );
   geoSimule.positionActuelle.mockResolvedValue({ ok: true, position: POSITION });
   geoSimule.adresseDepuisPosition.mockResolvedValue(ADRESSE_POSITION);
+});
+
+/**
+ * L'horloge n'est figée que par les tests qui en ont besoin, et seulement pour `Date` :
+ * geler aussi les minuteries ferait attendre indéfiniment les écritures en base, qui
+ * sont asynchrones. On la remet en place après chaque test, sans quoi l'heure gelée
+ * déteindrait sur les suivants.
+ */
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('construireBonInstantane', () => {
@@ -123,16 +134,92 @@ describe('construireBonInstantane', () => {
     expect(bon.lignes[0].libelle).toBe('Transport de personnes');
   });
 
-  it('date la réservation et la prise en charge au même instant', () => {
-    // C'est la vérité de ce geste : le bon est établi quand le client monte. La
-    // réservation n'est donc pas antérieure à la prise en charge, elle lui est égale.
-    // Un décalage inverse serait un blocage ; l'égalité, non.
+  it('date la réservation et la prise en charge au même instant, sans antédatation', () => {
+    // Comportement d'origine, et toujours celui par défaut : le bon est établi quand le
+    // client monte, les deux horodatages valent alors l'instant présent, et la
+    // réservation n'est pas antérieure à la prise en charge — elle lui est égale. Un
+    // décalage INVERSE serait un blocage ; l'égalité, non.
     const bon = construireBonInstantane(clientInstantaneTest(), REGLAGES, 'Départ');
 
     expect(bon.dateReservation).toBe(bon.datePriseEnCharge);
     expect(bon.heureReservation).toBe(bon.heurePriseEnCharge);
     expect(bon.dateReservation).not.toBe('');
     expect(bon.heureReservation).not.toBe('');
+  });
+
+  it('recule la réservation seule, et laisse la prise en charge à l’instant du geste', () => {
+    // Le point de tout le réglage, et il est contre-intuitif. Reculer les DEUX dates les
+    // laisserait ÉGALES : le justificatif serait exactement aussi faible qu'avant,
+    // simplement daté plus tôt — et il affirmerait une prise en charge déjà passée alors
+    // que le client est en train de monter. C'est la SÉPARATION des deux dates qui en
+    // fait un justificatif de réservation préalable.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 8, 17, 14, 30));
+
+    const bon = construireBonInstantane(
+      clientInstantaneTest(),
+      reglagesTest({ antedatationReservationMinutes: 30 }),
+      'Départ',
+    );
+
+    expect(bon.dateReservation).toBe('2026-09-17');
+    expect(bon.heureReservation).toBe('14:00');
+    expect(bon.datePriseEnCharge).toBe('2026-09-17');
+    expect(bon.heurePriseEnCharge).toBe('14:30');
+  });
+
+  it('passe à la veille quand le recul franchit minuit', () => {
+    // Le piège classique : soustraire les minutes à l'HEURE seule donnerait « -00:15 »,
+    // ou bien « 23:45 » sans changer de jour — un justificatif daté d'un jour trop tard.
+    // Le recul porte donc sur un instant, et la date est relue ensuite.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 8, 17, 0, 15));
+
+    const bon = construireBonInstantane(
+      clientInstantaneTest(),
+      reglagesTest({ antedatationReservationMinutes: 30 }),
+      'Départ',
+    );
+
+    expect(bon.dateReservation).toBe('2026-09-16');
+    expect(bon.heureReservation).toBe('23:45');
+    expect(bon.datePriseEnCharge).toBe('2026-09-17');
+    expect(bon.heurePriseEnCharge).toBe('00:15');
+  });
+
+  it('ne produit pas une date invalide quand le réglage manque à l’appel', () => {
+    // Une sauvegarde restaurée peut ne pas porter ce champ : `backup.ts` écrit les
+    // réglages de l'archive tels quels. Sans garde-fou, la date deviendrait
+    // « NaN-NaN-NaN » — que le contrôle de conformité ACCEPTE, puisqu'il ne juge pas la
+    // forme des dates. Un justificatif daté du néant, et sans le moindre message.
+    const bon = construireBonInstantane(
+      clientInstantaneTest(),
+      reglagesTest({ antedatationReservationMinutes: undefined as unknown as number }),
+      'Départ',
+    );
+
+    expect(bon.dateReservation).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(bon.dateReservation).not.toContain('NaN');
+    expect(bon.dateReservation).toBe(bon.datePriseEnCharge);
+  });
+
+  it('laisse l’horodatage de création à l’heure réelle', () => {
+    // `creeLe` est la trace interne du moment où le document a été produit, et il sert à
+    // ordonner la liste des bons. L'antédater aussi ferait mentir le journal d'audit sur
+    // la seule chose qu'il doit garantir — et l'antédatation ne regarde que le
+    // justificatif remis au client, pas ce que l'application sait de sa propre histoire.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 8, 17, 14, 30));
+
+    const bon = construireBonInstantane(
+      clientInstantaneTest(),
+      reglagesTest({ antedatationReservationMinutes: 120 }),
+      'Départ',
+    );
+
+    expect(bon.creeLe).toBe(new Date(2026, 8, 17, 14, 30).toISOString());
+    expect(bon.heureReservation).toBe('12:30');
+    expect(bon.heurePriseEnCharge).toBe('14:30');
   });
 
   it('reprend la distance du profil sans interroger le réseau', () => {
@@ -148,6 +235,24 @@ describe('construireBonInstantane', () => {
 describe('problemesInstantane', () => {
   it('ne trouve aucun blocage sur un profil complet', () => {
     expect(blocages(problemesInstantane(clientInstantaneTest(), REGLAGES))).toEqual([]);
+  });
+
+  it('ne bloque pas un profil antédaté, et place la réservation avant la prise en charge', () => {
+    // L'antédatation recule la réservation SANS toucher à la prise en charge : la
+    // chronologie exigée par l'arrêté est donc respectée, et mieux qu'avant — la
+    // réservation précède enfin la prise en charge au lieu de lui être égale. Si le
+    // réglage reculait les deux dates, ce test passerait aussi ; c'est le suivant, qui
+    // fixe l'écart, qui distingue les deux comportements.
+    const settings = reglagesTest({ antedatationReservationMinutes: 120 });
+    const client = clientInstantaneTest();
+
+    expect(blocages(problemesInstantane(client, settings))).toEqual([]);
+
+    const bon = construireBonInstantane(client, settings, client.instantane.lieuPriseEnCharge);
+    const reservation = horodatage(bon.dateReservation, bon.heureReservation) ?? 0;
+    const priseEnCharge = horodatage(bon.datePriseEnCharge, bon.heurePriseEnCharge) ?? 0;
+
+    expect(priseEnCharge - reservation).toBe(120 * 60_000);
   });
 
   it('bloque un client sans téléphone', () => {
@@ -308,5 +413,22 @@ describe('genererBonInstantane', () => {
 
     expect(enBase).toBeDefined();
     expect(blocages(verifierConformiteBon(enBase!, REGLAGES, clientInstantaneTest()))).toEqual([]);
+  });
+
+  it('conserve l’antédatation jusqu’au bon émis, relu depuis la base', async () => {
+    // Le réglage doit survivre au chemin complet — position, contrôle, écriture,
+    // numérotation, copies figées — et pas seulement à la construction en mémoire.
+    // L'écart est mesuré sur le document réellement écrit : c'est la seule version qui
+    // existe pour l'agent qui le contrôlera.
+    const settings = reglagesTest({ antedatationReservationMinutes: 30 });
+    const { bon } = await genererBonInstantane(clientInstantaneTest(), settings);
+    const enBase = await db.bons.get(bon.id);
+
+    expect(enBase).toBeDefined();
+    const reservation = horodatage(enBase!.dateReservation, enBase!.heureReservation) ?? 0;
+    const priseEnCharge = horodatage(enBase!.datePriseEnCharge, enBase!.heurePriseEnCharge) ?? 0;
+
+    expect(priseEnCharge - reservation).toBe(30 * 60_000);
+    expect(blocages(verifierConformiteBon(enBase!, settings, clientInstantaneTest()))).toEqual([]);
   });
 });

@@ -27,6 +27,7 @@ import { IconeEclair } from '../../components/icons';
 import { blocages } from './conformite';
 import { genererBonInstantane, problemesInstantane } from './instantane';
 import { ErreurConformite } from './service';
+import { libelleAntedatation, minutesAntedatation } from '../../lib/antedatation';
 import { formatEuros } from '../../lib/money';
 import { formatKilometres, libelleModePaiement, libelleTypePrestation } from '../../lib/format';
 import type { Client } from '../../types';
@@ -62,6 +63,10 @@ export function PageInstantane() {
   if (!settings) return null;
 
   const profils = clients.filter((client) => client.instantane.actif);
+
+  // La lecture est défensive : une sauvegarde restaurée peut ne pas porter ce champ.
+  // Voir `minutesAntedatation`, qui explique ce qu'un `undefined` produirait ici.
+  const recul = minutesAntedatation(settings.antedatationReservationMinutes);
 
   const generer = async (client: Client) => {
     if (gesteEnCours.current) return;
@@ -111,9 +116,11 @@ export function PageInstantane() {
       </header>
 
       <Bandeau ton="neutre">
-        La date de réservation est enregistrée au moment où vous générez le bon. Générez-le donc
-        avant que le client ne monte : un justificatif daté d’après la course ne prouve pas
-        qu’il y a eu réservation.
+        {recul > 0
+          ? `La réservation sera datée de ${libelleAntedatation(recul)} avant la prise en charge, qui reste à l’heure du geste.`
+          : 'La réservation et la prise en charge seront datées au moment où vous générez le bon.'}{' '}
+        Générez-le donc avant que le client ne monte : un justificatif daté d’après la course ne
+        prouve pas qu’il y a eu réservation.
       </Bandeau>
 
       {!settings.aideAdresse ? (

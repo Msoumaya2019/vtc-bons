@@ -84,6 +84,17 @@ produire.** Il établit que le bon existait au moment du contrôle, pas que la c
 été réservée à l'avance. Générez-le donc **avant que le client ne monte**, jamais après la
 course — un bon instantané créé à l'arrivée ne prouverait rien du tout.
 
+**Pour corriger cela, les Réglages permettent d'antédater la réservation** de 5, 10 ou
+30 minutes, 1 heure ou 2 heures. La réservation recule d'autant, et la prise en charge
+reste à l'heure du geste : le bon porte alors « réservé à 14 h 00, prise en charge à
+14 h 30 », qui est la vérité de la plupart des courses et ce que l'agent s'attend à lire.
+
+**Seule la réservation recule**, et c'est délibéré. Reculer les deux dates les laisserait
+*égales* : le justificatif serait exactement aussi faible qu'avant, simplement daté plus
+tôt — et il annoncerait une prise en charge déjà passée alors que le client est en train de
+monter. C'est la séparation des deux dates qui en fait un justificatif de réservation
+*préalable*.
+
 Quand vous connaissez la course à l'avance, passez par *Nouveau* : la date de réservation y
 est distincte, et le justificatif est bien plus solide.
 
@@ -210,7 +221,7 @@ Le guide pas à pas, sans ligne de commande, se trouve dans **[SETUP.md](SETUP.m
 
 ## Ce que les tests vérifient
 
-403 tests, répartis en dix-huit fichiers. Ils ne mesurent pas la quantité de code, mais les
+418 tests, répartis en dix-neuf fichiers. Ils ne mesurent pas la quantité de code, mais les
 endroits où une erreur coûte cher.
 
 | Fichier | Ce qu'il protège |
@@ -225,10 +236,11 @@ endroits où une erreur coûte cher.
 | `backup.test.ts` | Aller-retour de sauvegarde fidèle, sauvegarde corrompue refusée, et survie du profil de bon instantané — le perdre ferait retomber le chauffeur sur la saisie complète sans le lui dire |
 | `geo.test.ts` | L'aide à l'adresse face au réseau : coupé, en panne, réponse illisible — la fonction rend toujours la main. Vérifie aussi l'ordre des coordonnées envoyées à OSRM : inversées, elles ne produisent pas d'erreur mais un point au milieu de l'océan, et une distance absurde |
 | `champ-adresse.test.tsx` | Le champ d'adresse : choix d'une proposition, parcours au clavier, et Échap qui referme la liste **sans** fermer la fenêtre qui l'abrite |
-| `instantane.test.ts` | Le bon instantané : conversion du prix TTC en HT (sans quoi le client paierait la TVA deux fois), repli sur l'adresse du profil quand la position manque, refus d'un profil sans prix (un bon à 0 € est légalement valable — le contrôle de conformité ne peut donc pas l'attraper), et surtout l'absence de brouillon laissé derrière un échec |
+| `antedatation.test.ts` | Le réglage qui recule l'heure de réservation du bon instantané. Ce qu'il protège vraiment, c'est la **lecture** du réglage : une sauvegarde restaurée ne passe pas par la fusion des valeurs par défaut, et un réglage absent multiplié par 60 000 vaut `NaN`. Le bon partirait alors daté « NaN-NaN-NaN » — et il **passerait** le contrôle de conformité, qui vérifie que les dates sont renseignées et ordonnées, jamais qu'elles sont des dates |
+| `instantane.test.ts` | Le bon instantané : conversion du prix TTC en HT (sans quoi le client paierait la TVA deux fois), repli sur l'adresse du profil quand la position manque, refus d'un profil sans prix (un bon à 0 € est légalement valable — le contrôle de conformité ne peut donc pas l'attraper), et surtout l'absence de brouillon laissé derrière un échec. Vérifie aussi que l'antédatation recule la **réservation seule** : reculer les deux dates les laisserait égales, et le justificatif serait aussi faible qu'avant, simplement daté plus tôt. Le passage de minuit est éprouvé, parce que reculer l'heure sans reculer le jour donnerait un justificatif daté d'un jour trop tard — et que l'horodatage de création, lui, doit rester à l'heure réelle |
 | `instantane-ecran.test.tsx` | L'onglet Instantané : profil incomplet annoncé **avant** l'appui, génération en un clic, réserve qui reste affichée, et relecture d'une fiche client enregistrée avant cette fonctionnalité |
 | `lienProfond.test.ts` | La traduction d'une adresse `vtcbons://…` vers un onglet — et surtout ses **refus** : un autre schéma, une cible inconnue, une adresse illisible ou absente ne doivent ouvrir **rien**. Un repli sur l'assistant de création ouvrirait le mauvais écran, sans le dire, au moment précis où le chauffeur croit tenir son bon instantané |
-| `app.test.tsx` | Le démarrage réel de l'application : montage, routage, charte, mode contrôle, et le repère de version des Réglages — sans lui, un essai sur le téléphone ne dit pas quelle version a été essayée. Vérifie aussi la saisie des montants : un champ qui réécrit sa valeur à chaque frappe se réécrit sous le doigt, le curseur repart à la fin et un chiffre tapé après la virgule ne change rien — invisible au clavier d'un ordinateur, systématique sur un téléphone. Vérifie enfin l'ouverture **directe** sur un onglet, sans passer par la racine : c'est tout ce que sait faire un raccourci d'écran d'accueil, et la route « * » ramènerait sinon vers l'assistant de création sans le moindre message. Et la réception d'un lien profond : au démarrage, quand l'application est déjà ouverte — et **jamais** dans un navigateur, où aucun lien n'arrive |
+| `app.test.tsx` | Le démarrage réel de l'application : montage, routage, charte, mode contrôle, et le repère de version des Réglages — sans lui, un essai sur le téléphone ne dit pas quelle version a été essayée. Vérifie aussi la saisie des montants : un champ qui réécrit sa valeur à chaque frappe se réécrit sous le doigt, le curseur repart à la fin et un chiffre tapé après la virgule ne change rien — invisible au clavier d'un ordinateur, systématique sur un téléphone. Vérifie enfin l'ouverture **directe** sur un onglet, sans passer par la racine : c'est tout ce que sait faire un raccourci d'écran d'accueil, et la route « * » ramènerait sinon vers l'assistant de création sans le moindre message. Et la réception d'un lien profond : au démarrage, quand l'application est déjà ouverte — et **jamais** dans un navigateur, où aucun lien n'arrive. Vérifie encore l'adresse d'accès direct à l'onglet Instantané : celle du site dans un navigateur, et le lien profond `vtcbons://instantane` dans l'application installée — masquer ce bloc en natif, au motif que l'adresse du site n'y résoudrait nulle part, laissait le raccourci iOS impossible à renseigner. Vérifie enfin que le réglage d'antédatation s'enregistre réellement, en le relisant **depuis la base** |
 | `format.test.ts`, `validation.test.ts`, `ui.test.tsx` | Dates en heure locale, identifiants administratifs, composants d'interface — dont la saisie d'un montant : champ vide quand le montant est nul, texte conservé tel qu'il est tapé, contenu sélectionné au focus, et saisie illisible gardée à l'écran plutôt que remplacée |
 | `navigation-jsdom.test.tsx` | Le comportement de l'environnement de test sur lequel repose la navigation des autres tests — il n'éprouve pas l'application. Il fixe le fait qu'une écriture dans l'adresse est appliquée **tout de suite** mais n'avertit le routeur que **plus tard**, si bien qu'un remplacement d'adresse survenu entre-temps est celui que le routeur suivra. C'est ce qui faisait naviguer un test vers une route et le laissait sur une autre, sans message |
 

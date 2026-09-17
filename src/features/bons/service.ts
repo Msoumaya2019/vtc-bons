@@ -40,9 +40,25 @@ export function ligneVide(settings: Settings): LignePrestation {
   };
 }
 
-/** Bon vide, pré-rempli avec l'instant présent et le véhicule habituel. */
-export function bonVide(settings: Settings, clientParDefaut: Client | null): Bon {
-  const maintenant = new Date();
+/**
+ * Bon vide, pré-rempli avec l'instant présent et le véhicule habituel.
+ *
+ * `instant` est le moment où le bon est ÉTABLI, et il gouverne d'un seul coup la date de
+ * création et les quatre champs d'horodatage. Le recevoir plutôt que le relire ici n'est
+ * pas une commodité de test : deux lectures d'horloge séparées par une frontière de
+ * minute donneraient une réservation et une prise en charge espacées d'une minute que
+ * personne n'a vécue — et, avec l'antédatation, une réservation qui semblerait reculée
+ * d'une minute de plus que le réglage demandé.
+ *
+ * L'appelant qui ne fournit rien obtient l'instant présent, ce qui est le cas de la
+ * saisie manuelle.
+ */
+export function bonVide(
+  settings: Settings,
+  clientParDefaut: Client | null,
+  instant: Date = new Date(),
+): Bon {
+  const maintenant = instant;
   return {
     id: identifiant(),
     numero: null,

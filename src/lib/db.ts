@@ -109,6 +109,12 @@ export function parametresParDefaut(): Settings {
     // chauffeur peut le couper, et plus rien ne sort alors de l'appareil.
     aideAdresse: true,
 
+    // Aucune antédatation par défaut. Ce réglage existe pour corriger un défaut connu —
+    // la réservation du bon instantané porte la même heure que la prise en charge — mais
+    // le corriger d'office changerait la date de documents déjà émis, sans que le
+    // chauffeur l'ait demandé. C'est à lui de l'activer.
+    antedatationReservationMinutes: 0,
+
     derniereSauvegarde: null,
   };
 }

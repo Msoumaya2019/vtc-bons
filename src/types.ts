@@ -226,6 +226,16 @@ export interface Settings {
    */
   aideAdresse: boolean;
 
+  /**
+   * Minutes retranchées à l'heure de RÉSERVATION du bon instantané.
+   *
+   * La prise en charge n'est jamais décalée, et c'est délibéré : reculer les deux dates
+   * ensemble les laisserait égales, donc le justificatif aussi faible qu'avant. Le
+   * raisonnement complet est dans `src/lib/antedatation.ts`, avec la lecture défensive
+   * qui protège les sauvegardes restaurées.
+   */
+  antedatationReservationMinutes: number;
+
   derniereSauvegarde: string | null;
 }
 

@@ -16,7 +16,8 @@ import {
   validerTvaIntracom,
 } from '../../lib/validation';
 import { COULEURS_PREDEFINIES } from '../../lib/couleurs';
-import { estApplicationNative } from '../../lib/native';
+import { ANTEDATATIONS_PROPOSEES, libelleAntedatation } from '../../lib/antedatation';
+import { AdresseInstantane } from './AdresseInstantane';
 import type { RegimeTVA, Settings, TraitementPeages } from '../../types';
 
 type Erreurs = Partial<Record<keyof Settings, string>>;
@@ -711,6 +712,32 @@ export function PageReglages() {
       </SectionRepliable>
 
       <SectionRepliable
+        titre="Bon instantané"
+        description="Antédater la réservation"
+      >
+        <Champ
+          label="Reculer l’heure de réservation"
+          aide="Le bon instantané est établi au moment où le client monte : sa réservation et sa prise en charge portent alors la même heure. Reculez la réservation pour y inscrire le moment où le client a réellement réservé — c’est ce qui en fait un justificatif de réservation PRÉALABLE. L’heure de prise en charge, elle, n’est jamais décalée : la reculer aussi laisserait les deux dates égales, et le justificatif ne prouverait pas davantage qu’avant."
+        >
+          {() => (
+            <Liste
+              value={String(brouillon.antedatationReservationMinutes)}
+              onChange={(evenement) =>
+                maj('antedatationReservationMinutes', Number(evenement.target.value))
+              }
+              data-testid="antedatation-reservation"
+            >
+              {ANTEDATATIONS_PROPOSEES.map((minutes) => (
+                <option key={minutes} value={minutes}>
+                  {libelleAntedatation(minutes)}
+                </option>
+              ))}
+            </Liste>
+          )}
+        </Champ>
+      </SectionRepliable>
+
+      <SectionRepliable
         titre="Aide à la saisie d’adresse"
         description="Propositions, position actuelle, distance"
       >
@@ -747,30 +774,12 @@ export function PageReglages() {
         </Bandeau>
       ) : null}
 
-      {/* Adresse directe de l'onglet Instantané.
-          Elle n'est pas décorative : Safari sur iOS ne connaît pas les raccourcis du
-          manifeste, et le seul moyen d'y obtenir un accès direct depuis l'écran d'accueil
-          est de créer soi-même un raccourci vers cette adresse. Encore faut-il pouvoir la
-          lire — or une application installée n'affiche aucune barre d'adresse, et le
-          dièse est justement la partie qu'on ne peut pas deviner.
-
-          Elle n'est affichée QUE dans le navigateur. Dans l'application native, l'origine
-          n'est pas celle du site mais celle de la fenêtre interne (`https://localhost` sur
-          Android, `capacitor://localhost` sur iOS) : l'adresse affichée ne résoudrait nulle
-          part ailleurs, et le chauffeur créerait un raccourci qui ne s'ouvre pas. Or les
-          applications natives ne lisent pas le manifeste non plus : il n'y a rien à y
-          proposer, donc rien à y montrer. */}
-      {estApplicationNative() ? null : (
-        <div className="pt-2 text-center">
-          <p className="texte-muet">Adresse directe de l’onglet Instantané</p>
-          <p
-            className="texte-muet select-all break-all font-mono text-xs"
-            data-testid="adresse-raccourci"
-          >
-            {adresseRaccourci()}
-          </p>
-        </div>
-      )}
+      {/* Adresse à recopier pour ouvrir l'onglet Instantané depuis l'extérieur.
+          Elle n'est pas décorative : une application installée n'affiche aucune barre
+          d'adresse, et le dièse est justement la partie qu'on ne peut pas deviner.
+          Le composant choisit l'adresse du site ou celle du lien profond selon le
+          contexte — voir son en-tête, qui explique pourquoi les deux existent. */}
+      <AdresseInstantane />
 
       {/* Repère de version. Il n'est pas décoratif : un onglet ou une application déjà
           ouverts continuent d'exécuter l'ancien code après une mise à jour, si bien
@@ -815,16 +824,4 @@ function libelleVersion(): string {
   if (typeof __DATE_COMMIT__ !== 'string' || __DATE_COMMIT__ === '') return 'Version inconnue';
   const [annee, mois, jour] = __DATE_COMMIT__.split('-');
   return `Version du ${jour}/${mois}/${annee} (${__COMMIT__})`;
-}
-
-/**
- * Adresse qui ouvre directement l'onglet Instantané.
- *
- * Elle est construite à partir de l'adresse réelle de la page, et non écrite en dur :
- * l'application est publiée dans un sous-répertoire (`/vtc-bons/`), qui changerait si le
- * dépôt était renommé. Seul l'onglet est fixe — et c'est aussi la seule partie que le
- * serveur ne voit pas, puisqu'elle suit le dièse.
- */
-function adresseRaccourci(): string {
-  return `${window.location.origin}${window.location.pathname}#/instantane`;
 }
