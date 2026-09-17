@@ -1,11 +1,15 @@
 name: Android — APK et App Bundle
 
-# Produit les trois fichiers Android, TOUS NON SIGNÉS :
-#   • app-debug.apk            pour tester rapidement (signé avec la clé de debug)
-#   • app-release-unsigned.apk à signer soi-même, par exemple avec eSign
-#   • app-release.aab          à déposer sur Google Play Console
+# Produit les trois fichiers Android :
+#   • app-debug.apk            pour tester rapidement — SIGNÉ avec la clé de debug
+#   • app-release-unsigned.apk NON SIGNÉ, à signer soi-même, par exemple avec eSign
+#   • app-release.aab          NON SIGNÉ, à déposer sur Google Play Console
 #
-# Aucune clé de signature n'est stockée dans ce dépôt, qui est public.
+# Aucune clé de signature de PRODUCTION n'est stockée dans ce dépôt, qui est public.
+#
+# C'est `app-debug.apk` qui se remet au chauffeur : le « release non signé » ne s'installe pas,
+# Android refusant un paquet sans bloc de signature. Le vérifier avant de le remettre, en
+# cherchant la magie « APK Sig Block 42 » dans ses derniers kilo-octets.
 on:
   workflow_dispatch:
   push:
@@ -113,6 +117,21 @@ jobs:
         # vérifier que les trois documents restent des XML bien formés — ce qui se voit ici,
         # et non au milieu d'une compilation Gradle.
         run: python3 scripts/declarer-raccourci-android.py android
+
+      - name: Restaurer la clé de signature de debug
+        # Sans ce cache, l'exécuteur fabrique une NOUVELLE clé de debug à chaque exécution.
+        # Installer alors la nouvelle version par-dessus l'ancienne échoue par conflit de
+        # signature, et le seul remède — désinstaller — efface les données locales du
+        # chauffeur. Mesuré : deux exécutions le même jour, deux certificats différents.
+        #
+        # Ce magasin signe un APK de debug, pas une version publiée : le dépôt reste public
+        # sans secret. La clé de cache est FIXE et ne porte pas le sha du commit — une clé
+        # qui changerait à chaque poussée ne restaurerait jamais rien, tout en donnant
+        # l'illusion que le cache fonctionne.
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: android-debug-keystore-v1
 
       - name: APK de test
         working-directory: android

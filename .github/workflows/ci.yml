@@ -43,6 +43,13 @@ jobs:
         # seulement — jamais en local sous Windows. Autant le dire clairement.
         run: npm run verifier:binaires
 
+      - name: Vérifier les flux de travail
+        # Un flux mal formé ne démarre pas, et le dit tout de suite. Un script `run:`
+        # invalide, lui, laisse le flux démarrer puis échoue APRÈS l'installation complète —
+        # Java, le SDK, les dépendances. Le contrôle analyse donc le YAML ET passe chaque
+        # script à `bash -n`, ce qui attrape la faute de frappe avant de la payer.
+        run: npm run verifier:flux
+
       - name: Vérifier qu'aucun secret n'est versionné
         # Le dépôt est public : un keystore ou un fichier .env committé par erreur
         # serait exposé définitivement. On échoue AVANT de compiler quoi que ce soit.
