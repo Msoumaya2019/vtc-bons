@@ -122,37 +122,52 @@ jobs:
         # Sans ce cache, l'exécuteur fabrique une NOUVELLE clé de debug à chaque exécution.
         # Installer alors la nouvelle version par-dessus l'ancienne échoue par conflit de
         # signature, et le seul remède — désinstaller — efface les données locales du
-        # chauffeur. Mesuré : deux exécutions le même jour, deux certificats différents.
+        # chauffeur. Mesuré : trois exécutions le même jour, trois certificats différents.
+        #
+        # LE CHEMIN COMPTE, et ce n'est pas celui qu'on croit. Gradle range le magasin sous
+        # `$HOME/.config/.android/`, pas sous `$HOME/.android/` : `AndroidLocation` préfère le
+        # dossier de configuration XDG. Écrit `~/.android/debug.keystore`, ce cache
+        # n'enregistrait RIEN — `actions/cache` ne signale un chemin introuvable que par un
+        # avertissement, l'étape restait verte, et la clé changeait quand même à chaque
+        # compilation. Le contrôle placé après la compilation refuse désormais ce désaccord.
         #
         # Ce magasin signe un APK de debug, pas une version publiée : le dépôt reste public
         # sans secret. La clé de cache est FIXE et ne porte pas le sha du commit — une clé
         # qui changerait à chaque poussée ne restaurerait jamais rien, tout en donnant
         # l'illusion que le cache fonctionne.
+        #
+        # Elle expire aussi : GitHub supprime les entrées non consultées pendant plus de sept
+        # jours. Un projet qui compile moins souvent repart donc d'une clé neuve — d'où la
+        # consigne, côté chauffeur, d'exporter une sauvegarde avant CHAQUE installation.
         uses: actions/cache@v4
         with:
-          path: ~/.android/debug.keystore
+          path: ~/.config/.android/debug.keystore
           key: android-debug-keystore-v1
 
       - name: APK de test
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Situer le magasin de signature de debug
+      - name: Contrôler que le magasin de signature est là où le cache le cherche
         # `actions/cache` ne signale un chemin introuvable que par un AVERTISSEMENT, et l'étape
-        # reste verte : le cache ne s'enregistre pas, en silence. Mesuré : « Path Validation
-        # Error », aucune entrée créée — le correctif qui croyait stabiliser la clé ne faisait
-        # donc rien du tout, tout en ayant l'air de fonctionner.
+        # reste verte : le cache ne s'enregistre pas, en silence. Mesuré le 2026-09-17 : « Path
+        # Validation Error », aucune entrée créée, et trois exécutions donnant trois certificats
+        # — le correctif qui croyait stabiliser la clé ne faisait donc rien du tout, tout en
+        # ayant l'air de fonctionner.
         #
-        # Gradle range le magasin dans le « home » de l'utilisateur, qui n'est pas forcément `~`
-        # sous un exécuteur. On le cherche au lieu de le supposer.
+        # Ce contrôle ÉCHOUE si le magasin n'est pas là où le cache le prendra. Un déplacement
+        # d'emplacement doit casser la compilation, pas la rendre silencieusement inutile : la
+        # conséquence, sinon, est effacée des données sur le téléphone du chauffeur.
         run: |
-          echo "HOME=$HOME"
-          echo "ANDROID_SDK_HOME=${ANDROID_SDK_HOME:-<vide>}"
-          echo "ANDROID_USER_HOME=${ANDROID_USER_HOME:-<vide>}"
-          echo "user.home vu par Java : $(java -XshowSettings:properties -version 2>&1 | grep 'user.home' || true)"
-          echo "--- magasins trouves ---"
-          find "$HOME" /root "$RUNNER_TEMP" "$GITHUB_WORKSPACE" -name '*.keystore' 2>/dev/null || true
-          echo "--- fin ---"
+          ATTENDU="$HOME/.config/.android/debug.keystore"
+          TROUVE=$(find "$HOME" -name 'debug.keystore' 2>/dev/null | head -1)
+          echo "attendu : $ATTENDU"
+          echo "trouvé  : ${TROUVE:-<aucun>}"
+          if [ "$TROUVE" != "$ATTENDU" ]; then
+            echo "::error::Le magasin de signature n'est pas à l'emplacement mis en cache. Le cache ne s'enregistrerait pas, la clé changerait à chaque compilation, et chaque mise à jour effacerait les données locales du chauffeur."
+            exit 1
+          fi
+          echo "Le magasin est bien à l'emplacement mis en cache."
 
       - name: APK de production, non signé
         working-directory: android
