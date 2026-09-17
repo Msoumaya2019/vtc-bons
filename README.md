@@ -209,7 +209,7 @@ Le guide pas à pas, sans ligne de commande, se trouve dans **[SETUP.md](SETUP.m
 
 ## Ce que les tests vérifient
 
-385 tests, répartis en seize fichiers. Ils ne mesurent pas la quantité de code, mais les
+389 tests, répartis en dix-sept fichiers. Ils ne mesurent pas la quantité de code, mais les
 endroits où une erreur coûte cher.
 
 | Fichier | Ce qu'il protège |
@@ -228,6 +228,7 @@ endroits où une erreur coûte cher.
 | `instantane-ecran.test.tsx` | L'onglet Instantané : profil incomplet annoncé **avant** l'appui, génération en un clic, réserve qui reste affichée, et relecture d'une fiche client enregistrée avant cette fonctionnalité |
 | `app.test.tsx` | Le démarrage réel de l'application : montage, routage, charte, mode contrôle, et le repère de version des Réglages — sans lui, un essai sur le téléphone ne dit pas quelle version a été essayée. Vérifie aussi la saisie des montants : un champ qui réécrit sa valeur à chaque frappe se réécrit sous le doigt, le curseur repart à la fin et un chiffre tapé après la virgule ne change rien — invisible au clavier d'un ordinateur, systématique sur un téléphone. Vérifie enfin l'ouverture **directe** sur un onglet, sans passer par la racine : c'est tout ce que sait faire un raccourci d'écran d'accueil, et la route « * » ramènerait sinon vers l'assistant de création sans le moindre message |
 | `format.test.ts`, `validation.test.ts`, `ui.test.tsx` | Dates en heure locale, identifiants administratifs, composants d'interface — dont la saisie d'un montant : champ vide quand le montant est nul, texte conservé tel qu'il est tapé, contenu sélectionné au focus, et saisie illisible gardée à l'écran plutôt que remplacée |
+| `navigation-jsdom.test.tsx` | Le comportement de l'environnement de test sur lequel repose la navigation des autres tests — il n'éprouve pas l'application. Il fixe le fait qu'une écriture dans l'adresse est appliquée **tout de suite** mais n'avertit le routeur que **plus tard**, si bien qu'un remplacement d'adresse survenu entre-temps est celui que le routeur suivra. C'est ce qui faisait naviguer un test vers une route et le laissait sur une autre, sans message |
 
 Le test le plus utile est peut-être `app.test.tsx` : c'est le seul capable de détecter une
 erreur de câblage — un contexte mal placé, une route oubliée, un écran qui plante au
@@ -334,11 +335,17 @@ comporter de trou.
 
 Sur iPhone, la seule voie est de créer le raccourci soi-même, avec l'application
 **Raccourcis** et l'action « Ouvrir des URL ». L'adresse à employer est affichée tout en bas
-des Réglages, sous la version : une application installée n'affiche aucune barre d'adresse,
-et le dièse est précisément la partie qu'on ne peut pas deviner. Cette ouverture passe par
-Safari plutôt que par l'application installée. Le stockage de WebKit étant rattaché à
-l'origine et non à l'application — le quota est le même dans les deux cas — les données
-devraient s'y retrouver ; à confirmer sur l'appareil.
+des Réglages, sous la version : une application ajoutée à l'écran d'accueil depuis le
+navigateur n'affiche aucune barre d'adresse, et le dièse est précisément la partie qu'on ne
+peut pas deviner. Cette ouverture passe par Safari plutôt que par l'application installée. Le
+stockage de WebKit étant rattaché à l'origine et non à l'application — le quota est le même
+dans les deux cas — les données devraient s'y retrouver ; à confirmer sur l'appareil.
+
+Cette adresse n'est affichée **que dans le navigateur**. Dans les applications natives, elle
+désignerait `https://localhost` ou `capacitor://localhost`, une origine qui ne résout que de
+l'intérieur de l'application : un raccourci bâti dessus ne s'ouvrirait pas. Les applications
+natives ne lisant pas le manifeste non plus, il n'y a rien à y proposer — et donc rien à y
+montrer.
 
 La compilation vérifie ce raccourci (`npm run verifier:raccourci`) en lisant le manifeste
 **réellement publié**, et refuse une adresse hors de la portée déclarée, une adresse sans

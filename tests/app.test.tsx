@@ -71,9 +71,37 @@ const DELAI = 10_000;
  */
 vi.setConfig({ testTimeout: 45_000 });
 
+/**
+ * Demande une route au routeur, de façon SYNCHRONE.
+ *
+ * Écrire dans `location.hash` met l'adresse à jour tout de suite, mais jsdom ne prévient le
+ * routeur que par une `popstate` DIFFÉRÉE d'un `setTimeout(…, 0)`. Or `HashRouter` n'écoute
+ * que `popstate`, et il relit `window.location` au moment de l'événement : toute navigation
+ * concurrente survenue dans l'intervalle est donc celle qu'il suivra, et l'adresse demandée
+ * n'est jamais observée. Mesuré sur jsdom seul, sans l'application :
+ *
+ *   écriture « #/b » puis `replaceState('#/c')`  ->  le routeur n'a vu que « #/c »
+ *   écriture « #/b » puis événement synchrone     ->  le routeur a vu « #/b »
+ *
+ * C'est ce qui produisait des échecs sur un test DIFFÉRENT à chaque exécution, chaque fois
+ * avec l'écran de l'assistant de création affiché alors qu'une autre route était demandée :
+ * la redirection « / » vers « /nouveau » passait entre l'écriture et l'événement. En émettant
+ * l'événement nous-mêmes, dans la même tâche, la fenêtre se referme.
+ */
+async function allerA(chemin: string) {
+  // La redirection initiale « / » vers « /nouveau » passe par `replaceState`, qui réécrit
+  // l'adresse de l'entrée courante. Tant qu'elle n'a pas eu lieu, elle peut survenir APRÈS
+  // notre demande de route et l'écraser. L'adresse portant « #/nouveau » prouve qu'elle est
+  // derrière nous. La garde est ici, et non chez l'appelant, pour qu'aucun ne puisse l'oublier.
+  await waitFor(() => expect(window.location.hash).toBe('#/nouveau'), { timeout: DELAI });
+
+  window.location.hash = chemin;
+  window.dispatchEvent(new PopStateEvent('popstate'));
+}
+
 /** Amène l'application sur une route, puis attend que l'écran correspondant s'affiche. */
 async function attendreEcran(chemin: string, texteAttendu: RegExp | string) {
-  window.location.hash = chemin;
+  await allerA(chemin);
   await screen.findByText(texteAttendu, {}, { timeout: DELAI });
 }
 
@@ -92,6 +120,11 @@ let erreursConsole: string[] = [];
 beforeEach(async () => {
   await effacerToutesLesDonnees();
   window.location.hash = '#/';
+
+  // Une plateforme native simulée par un test ne doit pas survivre au suivant : la suite en
+  // compte qui vérifient le comportement de navigateur. Le retrait est fait ici, et non dans
+  // le test qui la pose, pour qu'un test interrompu ne laisse pas la suite dans un état faux.
+  delete window.Capacitor;
 
   // Valeurs par défaut des simulations réseau. Sans elles, un `vi.fn()` nu rend
   // `undefined`, et l'application appelle `.then()` sur ce résultat depuis une minuterie de
@@ -267,6 +300,29 @@ describe('routes', () => {
     expect(adresse).toHaveTextContent(/#\/instantane$/);
   });
 
+  it('ne propose pas cette adresse dans l’application native, où elle ne résoudrait nulle part', async () => {
+    // Dans l'application native, l'origine n'est pas celle du site mais celle de la fenêtre
+    // interne : « https://localhost » sur Android, « capacitor://localhost » sur iOS. Une
+    // telle adresse ne s'ouvre que depuis l'intérieur de l'application — le chauffeur qui en
+    // ferait un raccourci créerait un raccourci mort. Or les applications natives ne lisent
+    // pas le manifeste non plus : il n'y a rien à y proposer, donc rien à y montrer.
+    window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'ios' };
+
+    render(<App />);
+    await attendreDemarrage();
+    await attendreEcran('#/reglages', 'Réglages');
+
+    // L'ordre de ces deux assertions fait toute la valeur du test. « Réglages » figure AUSSI
+    // dans la barre d'onglets : l'attendre ne prouve pas que la page est chargée, et une
+    // assertion d'absence lue à cet instant passerait parce que RIEN n'est encore rendu — y
+    // compris sur un code fautif. On attend donc d'abord un repère propre à la page, et
+    // seulement ensuite on constate l'absence.
+    expect(
+      await screen.findByTestId('version-application', {}, { timeout: DELAI }),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('adresse-raccourci')).toBeNull();
+  });
+
   it('ouvre l’aide et la conformité', async () => {
     render(<App />);
     await attendreDemarrage();
@@ -382,7 +438,7 @@ describe('mode contrôle', () => {
       render(<App />);
       await attendreDemarrage();
 
-      window.location.hash = '#/controle/bon-inexistant';
+      await allerA('#/controle/bon-inexistant');
 
       expect(
         await screen.findByText('Chargement du justificatif…', {}, { timeout: DELAI }),

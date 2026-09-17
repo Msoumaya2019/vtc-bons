@@ -16,6 +16,7 @@ import {
   validerTvaIntracom,
 } from '../../lib/validation';
 import { COULEURS_PREDEFINIES } from '../../lib/couleurs';
+import { estApplicationNative } from '../../lib/native';
 import type { RegimeTVA, Settings, TraitementPeages } from '../../types';
 
 type Erreurs = Partial<Record<keyof Settings, string>>;
@@ -751,16 +752,25 @@ export function PageReglages() {
           manifeste, et le seul moyen d'y obtenir un accès direct depuis l'écran d'accueil
           est de créer soi-même un raccourci vers cette adresse. Encore faut-il pouvoir la
           lire — or une application installée n'affiche aucune barre d'adresse, et le
-          dièse est justement la partie qu'on ne peut pas deviner. */}
-      <div className="pt-2 text-center">
-        <p className="texte-muet">Adresse directe de l’onglet Instantané</p>
-        <p
-          className="texte-muet select-all break-all font-mono text-xs"
-          data-testid="adresse-raccourci"
-        >
-          {adresseRaccourci()}
-        </p>
-      </div>
+          dièse est justement la partie qu'on ne peut pas deviner.
+
+          Elle n'est affichée QUE dans le navigateur. Dans l'application native, l'origine
+          n'est pas celle du site mais celle de la fenêtre interne (`https://localhost` sur
+          Android, `capacitor://localhost` sur iOS) : l'adresse affichée ne résoudrait nulle
+          part ailleurs, et le chauffeur créerait un raccourci qui ne s'ouvre pas. Or les
+          applications natives ne lisent pas le manifeste non plus : il n'y a rien à y
+          proposer, donc rien à y montrer. */}
+      {estApplicationNative() ? null : (
+        <div className="pt-2 text-center">
+          <p className="texte-muet">Adresse directe de l’onglet Instantané</p>
+          <p
+            className="texte-muet select-all break-all font-mono text-xs"
+            data-testid="adresse-raccourci"
+          >
+            {adresseRaccourci()}
+          </p>
+        </div>
+      )}
 
       {/* Repère de version. Il n'est pas décoratif : un onglet ou une application déjà
           ouverts continuent d'exécuter l'ancien code après une mise à jour, si bien
