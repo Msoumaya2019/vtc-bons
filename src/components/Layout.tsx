@@ -44,17 +44,27 @@ export function Layout() {
         <Outlet />
       </main>
 
+      {/*
+        La hauteur est LUE depuis la variable, et non déduite du contenu.
+
+        C'est elle que la barre « Enregistrer » des Réglages lit pour se poser juste
+        au-dessus. La laisser s'auto-dimensionner rendrait cette hauteur imprévisible : elle
+        valait 57 px et non 56, parce que la hauteur de ligne du libellé s'ajoutait à la
+        hauteur minimale. Ce qui doit s'adosser à la barre ne peut pas dépendre d'un chiffre
+        qui se déduit tout seul.
+      */}
       <nav
-        className="zone-sure-bas fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95"
+        style={{ height: 'var(--hauteur-barre-onglets)' }}
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95"
         aria-label="Navigation principale"
       >
-        <div className="mx-auto flex w-full max-w-2xl">
+        <div className="mx-auto flex h-14 w-full max-w-2xl">
           {onglets.map(({ chemin, libelle, Icone }) => (
             <NavLink
               key={chemin}
               to={chemin}
               className={({ isActive }) =>
-                `flex min-h-[56px] flex-1 flex-col items-center justify-center gap-0.5 px-1 py-2 text-[10px] font-semibold transition-colors ${
+                `flex flex-1 flex-col items-center justify-center gap-0.5 px-1 text-[10px] font-semibold transition-colors ${
                   isActive ? '' : 'text-slate-500 dark:text-slate-400'
                 }`
               }

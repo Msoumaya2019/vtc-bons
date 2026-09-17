@@ -790,7 +790,20 @@ export function PageReglages() {
         {libelleVersion()}
       </p>
 
-      <div className="zone-sure-bas fixed inset-x-0 bottom-[56px] z-20 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
+      {/*
+        La barre se pose juste au-dessus de la barre d'onglets, à la hauteur EXACTE de
+        celle-ci, lue depuis la variable.
+
+        Elle portait auparavant un décalage écrit en dur — 56 px — alors que la barre
+        d'onglets grandit de la zone sûre du bas. Sur un téléphone à indicateur d'accueil,
+        elle la recouvrait donc de 36 px, et cachait 24 px du bouton « Enregistrer » sur les
+        44 px de sa hauteur. Mesuré dans un moteur, insertion basse simulée à 34 px.
+
+        Elle ne porte plus `zone-sure-bas` : elle n'est plus au bord de l'écran, donc elle
+        n'a plus de zone sûre à traiter — et cette classe y était de toute façon inopérante,
+        `py-3` l'emportant. Mesuré : son remplissage bas valait 12 px, pas 34.
+      */}
+      <div className="fixed inset-x-0 bottom-[var(--hauteur-barre-onglets)] z-20 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
         <div className="mx-auto flex w-full max-w-2xl items-center justify-between gap-3">
           <span className="texte-muet">
             {modifie ? 'Modifications non enregistrées' : 'Réglages à jour'}

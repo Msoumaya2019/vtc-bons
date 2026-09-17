@@ -7,6 +7,20 @@
     /* La couleur d'accent est pilotée à l'exécution depuis les Réglages. */
     --accent: #1d4ed8;
     --accent-soft: #eff6ff;
+
+    /*
+     * Hauteur de la barre d'onglets : 56 px de contenu, plus la zone sûre du bas.
+     *
+     * Elle est POSÉE ici, et non redéduite par chaque élément qui s'y adosse. La barre
+     * d'onglets est `fixed bottom-0` : ce qui doit se poser juste au-dessus d'elle a besoin
+     * de sa hauteur RÉELLE, et cette hauteur grandit de l'indicateur d'accueil. Un décalage
+     * écrit en dur — 56 px — laisse donc la barre recouvrir ce qui s'appuie dessus. Mesuré
+     * sur un téléphone à indicateur d'accueil simulé : 36 px de recouvrement, et 24 px du
+     * bouton « Enregistrer » cachés sur les 44 px de sa hauteur.
+     *
+     * La barre d'onglets lit elle-même cette valeur : les deux ne peuvent pas diverger.
+     */
+    --hauteur-barre-onglets: calc(3.5rem + env(safe-area-inset-bottom, 0px));
   }
 
   html {
@@ -26,10 +40,9 @@
     }
   }
 
-  /* Zones sûres iOS : la barre d'onglets ne doit jamais passer sous l'indicateur d'accueil. */
-  .zone-sure-bas {
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-  }
+  /* Zone sûre iOS : l'en-tête ne doit jamais passer sous l'encoche. Le bas, lui, est porté
+     par `--hauteur-barre-onglets` — il n'intéresse pas que la barre d'onglets, mais aussi ce
+     qui se pose au-dessus d'elle, qui ne peut pas lire une classe posée sur un autre élément. */
   .zone-sure-haut {
     padding-top: env(safe-area-inset-top, 0px);
   }

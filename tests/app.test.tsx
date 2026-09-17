@@ -7,6 +7,8 @@
  * premier rendu. Ce genre de défaut ne se voit ni au typecheck, ni au build.
  */
 
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { App } from '../src/App';
@@ -830,5 +832,87 @@ describe('saisie des montants', () => {
     // 1,5 % de 100 € : 98,50 € HT, et non 100 €. On vise la ligne « Total HT » : le
     // montant apparaît aussi dans le détail de TVA, où il désigne la base taxable.
     expect(screen.getByText('Total HT').closest('div')).toHaveTextContent('98,50 €');
+  });
+});
+
+/**
+ * Barres fixes du bas de l'écran.
+ *
+ * CE QUE CES TESTS GARDENT, ET CE QU'ILS NE GARDENT PAS.
+ *
+ * Le bouton « Enregistrer » des Réglages était à moitié caché par la barre d'onglets, sur un
+ * téléphone à indicateur d'accueil : la barre d'enregistrement lisait un décalage écrit en
+ * dur — 56 px — alors que la barre d'onglets grandit de la zone sûre du bas. Mesuré dans un
+ * moteur, insertion basse simulée à 34 px : 36 px de recouvrement, et 24 px du bouton cachés
+ * sur les 44 px de sa hauteur.
+ *
+ * Ils gardent la CAUSE — le décalage doit être LU depuis une variable partagée, jamais
+ * recopié — et non l'effet. jsdom ne calcule aucune mise en page : une mesure de recouvrement
+ * écrite ici serait verte quoi qu'il arrive. C'est la mesure dans un vrai moteur qui a validé
+ * le remède ; ces tests empêchent seulement qu'on réécrive le chiffre.
+ */
+describe('barres fixes du bas', () => {
+  /** Le nom de la variable `var(--…)` portée par une chaîne. */
+  function variableLue(texte: string): string {
+    const trouve = /var\((--[a-z-]+)\)/.exec(texte);
+    if (!trouve) throw new Error(`aucune variable var(--…) dans « ${texte} »`);
+    return trouve[1];
+  }
+
+  /** Ouvre les Réglages et rend la barre d'enregistrement. */
+  async function ouvrirLaBarre() {
+    await saveSettings(reglagesTest());
+    render(<App />);
+    await attendreDemarrage();
+
+    // Le repère de version, et non « Réglages » : ce dernier est aussi le libellé d'un
+    // onglet, donc l'attente serait satisfaite avant même que la route ait changé.
+    await allerA('#/reglages');
+    await waitFor(() => expect(screen.getByTestId('version-application')).toBeInTheDocument(), {
+      timeout: DELAI,
+    });
+
+    const bouton = screen.getByRole('button', { name: 'Enregistrer' });
+    const barre = bouton.closest('.fixed');
+    expect(barre, 'la barre d’enregistrement n’est plus fixe').not.toBeNull();
+    return barre as HTMLElement;
+  }
+
+  it('adosse la barre d’enregistrement à la hauteur réelle de la barre d’onglets', async () => {
+    const barre = await ouvrirLaBarre();
+    const nav = document.querySelector('nav[aria-label="Navigation principale"]') as HTMLElement;
+
+    // Les deux se réfèrent à la MÊME variable. En renommer une sans l'autre fait échouer ce
+    // test, alors qu'un décalage recopié des deux côtés ne se verrait nulle part.
+    expect(variableLue(barre.className)).toBe(variableLue(nav.style.height));
+  });
+
+  it('n’écrit jamais le décalage en dur, ni la classe qui n’y faisait rien', async () => {
+    const barre = await ouvrirLaBarre();
+
+    // Un décalage chiffré, c'est le défaut d'origine : la barre d'onglets grandit de la zone
+    // sûre du bas, le chiffre non.
+    expect(barre.className).not.toMatch(/bottom-\[\d/);
+
+    // `zone-sure-bas` y était inopérante — `py-3` l'emportait, mesuré à 12 px — tout en
+    // donnant à lire que la zone sûre était traitée. Elle n'a plus rien à y faire : la barre
+    // n'est plus au bord de l'écran.
+    expect(barre.className).not.toContain('zone-sure-bas');
+  });
+
+  it('déclare la hauteur une seule fois, dans la feuille de style, zone sûre comprise', () => {
+    // jsdom ne charge aucune feuille de style : la variable se lit donc dans le source. Si
+    // elle disparaissait, `var()` ne résoudrait rien, `bottom` retomberait à `auto`, et la
+    // barre repartirait dans le flux du document — un défaut qu'aucun autre test ne verrait.
+    //
+    // Le chemin passe par le répertoire de travail, et non par `import.meta.url` : sous
+    // jsdom, cette URL n'a pas le schéma `file:`, et `readFileSync` la refuse.
+    const css = readFileSync(path.resolve(process.cwd(), 'src/index.css'), 'utf-8');
+    const declaration = /--hauteur-barre-onglets:\s*([^;]+);/.exec(css);
+
+    expect(declaration, 'la variable de hauteur n’est plus déclarée').not.toBeNull();
+    const valeur = declaration![1];
+    expect(valeur).toMatch(/calc\(/);
+    expect(valeur).toContain('env(safe-area-inset-bottom');
   });
 });
