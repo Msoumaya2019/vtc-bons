@@ -213,7 +213,7 @@ Le guide pas à pas, sans ligne de commande, se trouve dans **[SETUP.md](SETUP.m
 | `npm run format` | Mise en forme automatique |
 | `npm run icons` | Régénère les icônes de l'application |
 | `npm run verifier:binaires` | Vérifie que les binaires natifs de Rollup suivent sa version |
-| `npm run verifier:raccourci` | Vérifie le raccourci d'écran d'accueil dans le manifeste publié |
+| `npm run verifier:raccourci` | Vérifie le raccourci d'écran d'accueil dans le manifeste publié, et l'accord du schéma d'adresse `vtcbons` entre l'application et ses quatre déclarations natives |
 | `npm run cap:android` | Ouvre le projet Android dans Android Studio |
 | `npm run cap:ios` | Ouvre le projet iOS dans Xcode |
 
@@ -364,7 +364,9 @@ compilation.
 
 Sur iPhone, il n'existe pas de raccourci d'écran d'accueil au sens d'Android. Vous créez le
 vôtre, une fois : application **Raccourcis**, action « Ouvrir des URL », adresse
-`vtcbons://instantane`, puis « Ajouter à l'écran d'accueil ».
+`vtcbons://instantane`, puis « Ajouter à l'écran d'accueil ». Cette adresse est rappelée dans
+les Réglages, avec un bouton pour la copier — sans quoi il faudrait la retenir de mémoire, ce
+qui n'arrive jamais deux fois de la même façon.
 
 #### Dans le navigateur
 
@@ -374,19 +376,34 @@ affichée tout en bas des Réglages, sous la version : une application ajoutée 
 d'accueil n'affiche aucune barre d'adresse, et le dièse est précisément la partie qu'on ne
 peut pas deviner.
 
-Cette adresse n'est affichée **que dans le navigateur**. Dans les applications natives, elle
-désignerait `https://localhost` ou `capacitor://localhost`, une origine qui ne résout que de
-l'intérieur de l'application : un raccourci bâti dessus ne s'ouvrirait pas. Les applications
-natives ne lisant pas le manifeste non plus, il n'y a rien à y proposer — et donc rien à y
-montrer.
+Dans les applications natives, l'adresse affichée est l'autre : `vtcbons://instantane`. C'est
+nécessaire, parce que l'origine du site n'y résoudrait nulle part — elle désignerait
+`https://localhost` ou `capacitor://localhost`, qui ne s'ouvre que de l'intérieur de
+l'application, et un raccourci bâti dessus ne s'ouvrirait pas.
+
+Ce bloc était auparavant **masqué** dans les applications natives, au motif que celles-ci ne
+lisent pas le manifeste : il n'y aurait donc rien à y proposer. C'était vrai du manifeste, et
+faux du lien profond — la déclaration native existait, mais son adresse n'était écrite nulle
+part, si bien que le raccourci iPhone, qui se construit à la main dans l'application Raccourcis,
+ne pouvait pas être renseigné. Les deux adresses sont donc affichées, chacune dans son contexte,
+avec un bouton pour les copier.
 
 #### Ce qui est vérifié, et ce qui ne peut l'être que sur le téléphone
 
 À la compilation : le raccourci du manifeste est relu dans le fichier **réellement publié**
 (`npm run verifier:raccourci`), qui refuse une adresse hors de la portée déclarée, une adresse
-sans dièse, ou un onglet absent de `src/App.tsx` ; les fragments natifs sont validés comme XML
-et confrontés à l'identifiant d'application ; et la traduction d'une adresse vers un onglet est
+sans dièse, ou un onglet absent de `src/App.tsx`. Le même contrôle vérifie que le **schéma
+d'adresse s'accorde d'un bout à l'autre** : la constante de l'application, le manifeste Android,
+le raccourci Android, la déclaration iOS et le script d'insertion. Ce schéma est écrit en clair à
+quatre endroits qui ne se voient pas entre eux, et en changer un seul ne casse rien, ne fait
+échouer aucun test et ne se voit pas à l'écran — le système ouvrirait l'application, qui
+refuserait l'adresse en silence. Les fragments natifs sont par ailleurs validés comme XML et
+confrontés à l'identifiant d'application, et la traduction d'une adresse vers un onglet est
 couverte par des tests, refus compris.
+
+Sur le téléphone, en revanche, trois choses ne peuvent être constatées que par vous : que le
+raccourci apparaît bien à l'appui long, que l'application s'ouvre sur l'onglet Instantané, et
+que le geste se fait d'un seul doigt. Aucune compilation ne les remplace.
 
 Sur le téléphone, en revanche, trois choses ne peuvent être constatées que par vous : que le
 raccourci apparaît bien à l'appui long, que l'application s'ouvre sur l'onglet Instantané, et
