@@ -239,7 +239,7 @@ export function NouveauBon() {
                     >
                       <span className="min-w-0">
                         <span className="flex items-center gap-2">
-                          <span className="truncate font-semibold text-slate-900 dark:text-slate-50">
+                          <span className="break-words font-semibold text-slate-900 dark:text-slate-50">
                             {client.nom}
                           </span>
                           {client.parDefaut ? <Badge ton="neutre">par défaut</Badge> : null}

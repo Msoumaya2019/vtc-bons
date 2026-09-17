@@ -145,7 +145,7 @@ export function DetailBon() {
               Partager
             </Bouton>
             <Bouton
-              onClick={() => telechargerPdf(bon.pdfBlob!, `bon-${bon.numero}.pdf`)}
+              onClick={() => void telechargerPdf(bon.pdfBlob!, `bon-${bon.numero}.pdf`)}
               icone={<IconeTelecharger className="h-4 w-4" />}
             >
               Télécharger

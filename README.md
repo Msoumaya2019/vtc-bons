@@ -176,6 +176,20 @@ toutes les deux semaines si la dernière sauvegarde est trop ancienne.
 L'export ZIP contient les données **et** tous les PDF déjà émis, tels qu'ils ont été
 émis. C'est le format à privilégier.
 
+### Partager un document, et ce que cela écrit sur le téléphone
+
+Sur le téléphone, « Partager » comme « Télécharger » ouvrent la feuille de partage du
+système. Ce n'est pas un choix d'interface : une WebView Android ignore l'attribut
+`download` d'un lien et n'implémente pas `navigator.share` — il n'existe donc aucun
+téléchargement direct possible. La feuille du système propose « Enregistrer dans Fichiers »,
+qui est la façon d'enregistrer un document sur Android comme sur iOS.
+
+Pour cela, l'application écrit une copie temporaire du PDF dans **son propre dossier de
+cache**, le seul que son fournisseur de fichiers expose au partage sur Android. Aucune
+permission n'est demandée, et **rien ne quitte l'appareil tant que vous n'avez pas choisi une
+destination dans cette feuille**. Le système vide ce cache de lui-même quand la place manque ;
+le document, lui, reste dans la base de l'application.
+
 ---
 
 ## Démarrage rapide
@@ -221,7 +235,7 @@ Le guide pas à pas, sans ligne de commande, se trouve dans **[SETUP.md](SETUP.m
 
 ## Ce que les tests vérifient
 
-425 tests, répartis en vingt fichiers. Ils ne mesurent pas la quantité de code, mais les
+438 tests, répartis en vingt-deux fichiers. Ils ne mesurent pas la quantité de code, mais les
 endroits où une erreur coûte cher.
 
 | Fichier | Ce qu'il protège |
@@ -242,6 +256,8 @@ endroits où une erreur coûte cher.
 | `lienProfond.test.ts` | La traduction d'une adresse `vtcbons://…` vers un onglet — et surtout ses **refus** : un autre schéma, une cible inconnue, une adresse illisible ou absente ne doivent ouvrir **rien**. Un repli sur l'assistant de création ouvrirait le mauvais écran, sans le dire, au moment précis où le chauffeur croit tenir son bon instantané |
 | `adresse-instantane.test.tsx` | L'adresse à recopier dans un raccourci, et son bouton de copie — le seul contrôle que le chauffeur touche vraiment ici. Ce qu'il protège tient en une phrase : une copie qui échoue **en silence** lui ferait coller du vide dans l'application Raccourcis, et le raccourci n'ouvrirait rien sans qu'il sache pourquoi. D'où deux chemins éprouvés, et pas seulement écrits : `navigator.clipboard`, absent d'un contexte non sécurisé — c'est le cas sur iPhone, où l'application est servie depuis `capacitor://localhost` — et le repli par sélection, obsolète mais seul à fonctionner dans une WebView. Vérifie aussi que l'adresse du site est **absolue** : un raccourci système ne résout pas `#/instantane`, qui ne désigne quelque chose qu'à l'intérieur d'une page ouverte |
 | `app.test.tsx` | Le démarrage réel de l'application : montage, routage, charte, mode contrôle, et le repère de version des Réglages — sans lui, un essai sur le téléphone ne dit pas quelle version a été essayée. Vérifie aussi la saisie des montants : un champ qui réécrit sa valeur à chaque frappe se réécrit sous le doigt, le curseur repart à la fin et un chiffre tapé après la virgule ne change rien — invisible au clavier d'un ordinateur, systématique sur un téléphone. Vérifie enfin l'ouverture **directe** sur un onglet, sans passer par la racine : c'est tout ce que sait faire un raccourci d'écran d'accueil, et la route « * » ramènerait sinon vers l'assistant de création sans le moindre message. Et la réception d'un lien profond : au démarrage, quand l'application est déjà ouverte — et **jamais** dans un navigateur, où aucun lien n'arrive. Vérifie encore l'adresse d'accès direct à l'onglet Instantané : celle du site dans un navigateur, et le lien profond `vtcbons://instantane` dans l'application installée — masquer ce bloc en natif, au motif que l'adresse du site n'y résoudrait nulle part, laissait le raccourci iOS impossible à renseigner. Vérifie enfin que le réglage d'antédatation s'enregistre réellement, en le relisant **depuis la base** |
+| `fichiers.test.ts` | Le partage et le téléchargement des PDF et des sauvegardes. Ce fichier existe parce que les deux boutons ne faisaient **rien** sur l'APK, sans le moindre message : toute la stratégie reposait sur `navigator.share` et sur l'attribut `download` d'une ancre, deux mécanismes absents d'une WebView Android — `navigator.share` y est explicitement non implémenté, alors qu'il fonctionne dans celle d'iOS, qui suit Safari. Le test qui manquait place donc le code dans les conditions d'une WebView Android, **sans** `navigator.share`, et exige que les greffons natifs prennent le relais. Vérifie aussi la **fidélité des octets** : un base64 mal formé enverrait un PDF corrompu chez le client, et c'est la seule chose que le chauffeur ne peut pas vérifier avant d'envoyer. Vérifie enfin que le découpage en tranches n'est pas décoratif — un document de 300 000 octets passe, là où `String.fromCharCode(...octets)` déborde la pile d'appels, c'est-à-dire précisément sur les PDF qui comptent |
+| `documents-ecran.test.tsx` | L'écran « Documents du chauffeur », où le chauffeur ne lisait que l'**initiale** de chaque libellé sur Android : « P » pour « Permis de conduire catégorie B en cours de validité ». Mesuré dans un moteur réel, le libellé ne disposait plus que de 23 px sur 360, soit quatre caractères sur cinquante et un. Ce test garde la **cause** — le libellé doit pouvoir revenir à la ligne, et la rangée qui le porte doit pouvoir renvoyer le badge dessous — et non l'effet : jsdom ne calcule aucune mise en page, où une mesure de largeur serait verte quoi qu'il arrive. Vérifie aussi que les actions, déplacées sur une seconde rangée, restent nommées pour un lecteur d'écran : sans quoi le remède aurait échangé un défaut de lisibilité contre une perte de fonction |
 | `format.test.ts`, `validation.test.ts`, `ui.test.tsx` | Dates en heure locale, identifiants administratifs, composants d'interface — dont la saisie d'un montant : champ vide quand le montant est nul, texte conservé tel qu'il est tapé, contenu sélectionné au focus, et saisie illisible gardée à l'écran plutôt que remplacée |
 | `navigation-jsdom.test.tsx` | Le comportement de l'environnement de test sur lequel repose la navigation des autres tests — il n'éprouve pas l'application. Il fixe le fait qu'une écriture dans l'adresse est appliquée **tout de suite** mais n'avertit le routeur que **plus tard**, si bien qu'un remplacement d'adresse survenu entre-temps est celui que le routeur suivra. C'est ce qui faisait naviguer un test vers une route et le laissait sur une autre, sans message |
 

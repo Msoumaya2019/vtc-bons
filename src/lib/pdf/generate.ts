@@ -145,12 +145,15 @@ export async function regenererPdfFacture(
   return resultat;
 }
 
-export { ouvrirBlob as ouvrirPdf, telechargerBlob as telechargerPdf } from '../fichiers';
+export { telechargerBlob as telechargerPdf } from '../fichiers';
 
 /**
- * Partage du PDF via la Web Share API quand elle est disponible (iOS et Android permettent
- * alors d'enregistrer dans Fichiers, d'envoyer par Mail ou Messages).
- * Repli automatique sur le téléchargement.
+ * Partage du PDF par le meilleur moyen disponible : l'API du web quand elle existe — un
+ * navigateur, et la WebView d'iOS qui suit Safari —, sinon les greffons natifs, seuls
+ * capables de partager dans une WebView Android.
+ *
+ * Le chauffeur y trouve « Enregistrer dans Fichiers », Mail, Messages et le reste. Voir
+ * `../fichiers` pour la raison de cet ordre.
  */
 export async function partagerPdf(
   blob: Blob,

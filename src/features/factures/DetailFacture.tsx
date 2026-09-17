@@ -149,7 +149,7 @@ export function DetailFacture() {
             </Bouton>
             <Bouton
               icone={<IconeTelecharger className="h-4 w-4" />}
-              onClick={() => telechargerPdf(facture.pdfBlob!, nomFichier)}
+              onClick={() => void telechargerPdf(facture.pdfBlob!, nomFichier)}
             >
               Télécharger
             </Bouton>

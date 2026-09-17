@@ -12,14 +12,18 @@ declare global {
 /**
  * Détection de l'enveloppe native Capacitor.
  *
- * Différence importante entre les deux contextes :
- *  - dans un navigateur (PWA), le téléchargement par ancre fonctionne et la Web Share API
- *    permet d'envoyer le PDF vers Fichiers, Mail ou Messages ;
- *  - dans une WebView native, l'attribut `download` d'une ancre est ignoré par le moteur
- *    de rendu. Le partage natif reste disponible, et l'utilisateur peut enregistrer le
- *    document depuis la feuille de partage du système.
+ * Ce que cette détection commande : le CHOIX DU MÉCANISME de partage et de téléchargement
+ * (`./fichiers`). Les deux contextes n'ont pas les mêmes moyens, et les confondre a coûté
+ * cher — les deux boutons étaient inertes sur l'APK :
  *
- * Le repli reste donc toujours le partage, puis l'ouverture du PDF dans la visionneuse.
+ *  - dans un navigateur, le téléchargement par ancre fonctionne, et la Web Share API permet
+ *    d'envoyer le PDF vers Fichiers, Mail ou Messages ;
+ *  - dans une WebView, l'attribut `download` d'une ancre est ignoré, et la Web Share API
+ *    n'existe pas du tout sur Android (browser-compat-data : `webview_android: false`).
+ *    Le partage doit donc y passer par les greffons natifs.
+ *
+ * iOS est le cas trompeur : sa WebView suit Safari, si bien que `navigator.share` y
+ * fonctionne. Un défaut peut donc n'apparaître que sur Android, et se croire absent.
  */
 export function estApplicationNative(): boolean {
   if (typeof window === 'undefined') return false;
@@ -37,10 +41,4 @@ export function plateforme(): string {
   } catch {
     return 'web';
   }
-}
-
-/** Indique si le partage de fichiers est disponible sur cet appareil. */
-export function partageFichierDisponible(): boolean {
-  if (typeof navigator === 'undefined') return false;
-  return typeof navigator.share === 'function' && typeof navigator.canShare === 'function';
 }

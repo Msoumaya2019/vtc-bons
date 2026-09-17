@@ -39,7 +39,7 @@ export function ModuleSauvegarde() {
     setEnCours(true);
     try {
       const blob = format === 'zip' ? await exporterZip() : await exporterJson();
-      telechargerBlob(blob, nomFichierSauvegarde(format));
+      await telechargerBlob(blob, nomFichierSauvegarde(format));
       await recharger();
       toast.succes(
         format === 'zip'

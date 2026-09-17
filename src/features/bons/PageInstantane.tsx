@@ -178,7 +178,7 @@ export function PageInstantane() {
             <Carte key={client.id} className="space-y-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="truncate font-semibold text-slate-900 dark:text-slate-50">
+                  <p className="break-words font-semibold text-slate-900 dark:text-slate-50">
                     {client.nom}
                   </p>
                   <p className="texte-muet">{profil.destination || 'Destination non renseignée'}</p>

@@ -68,7 +68,12 @@ export function ModuleDocuments() {
   const supprimer = async () => {
     if (!aSupprimer) return;
     await db.documentsChauffeur.delete(aSupprimer.id);
-    await journaliser('document', aSupprimer.id, 'suppression', `Document retiré : ${aSupprimer.libelle}`);
+    await journaliser(
+      'document',
+      aSupprimer.id,
+      'suppression',
+      `Document retiré : ${aSupprimer.libelle}`,
+    );
     setASupprimer(null);
     await recharger();
   };
@@ -113,11 +118,11 @@ export function ModuleDocuments() {
       ) : null}
 
       <Bandeau ton="neutre">
-        Liste indicative. En contrôle, il faut pouvoir présenter le permis, la carte
-        professionnelle VTC, les attestations d’assurance RC circulation et RC Pro, le macaron
-        VTC, le contrôle technique, la carte grise, le certificat médical d’aptitude (Cerfa
-        14880), l’inscription REVTC, et l’attestation de vigilance URSSAF si un contrat dépasse
-        5 000 €. Vérifiez cette liste auprès de l’autorité compétente.
+        Liste indicative. En contrôle, il faut pouvoir présenter le permis, la carte professionnelle
+        VTC, les attestations d’assurance RC circulation et RC Pro, le macaron VTC, le contrôle
+        technique, la carte grise, le certificat médical d’aptitude (Cerfa 14880), l’inscription
+        REVTC, et l’attestation de vigilance URSSAF si un contrat dépasse 5 000 €. Vérifiez cette
+        liste auprès de l’autorité compétente.
       </Bandeau>
 
       {documents.length === 0 ? (
@@ -131,30 +136,47 @@ export function ModuleDocuments() {
           {documents.map((document) => {
             const jours = joursRestants(document.dateExpiration);
             return (
-              <Carte key={document.id} className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+              <Carte key={document.id} className="space-y-2">
+                {/*
+                  Le libellé d'abord, et sur toute la largeur qu'il peut prendre.
+
+                  Ces libellés font jusqu'à cinquante-six caractères (« Attestation de
+                  vigilance URSSAF (contrat supérieur à 5 000 €) ») : ils ne tiennent PAS sur
+                  une ligne de téléphone, même seule. Le `truncate` d'avant les coupait donc,
+                  et le badge, « Modifier » et la poubelle — un groupe insécable — mangeaient
+                  toute la largeur restante. Il ne restait qu'une quinzaine de pixels au
+                  libellé, et le chauffeur ne lisait que son initiale : « P » pour « Permis
+                  de conduire… ».
+
+                  Le remède tient en deux points : le libellé peut revenir à la ligne
+                  (`break-words`), et le badge passe à la ligne suivante plutôt que de lui
+                  disputer la place (`flex-wrap` + une base de 10 rem).
+                */}
+                <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+                  <p className="min-w-0 flex-1 basis-40 break-words text-sm font-semibold text-slate-800 dark:text-slate-100">
                     {document.libelle}
                   </p>
-                  <p className="texte-muet">
+                  <Badge ton={tonDepuisJours(jours)}>{libelleEcheance(jours)}</Badge>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+                  <p className="texte-muet min-w-0 flex-1 basis-40">
                     {document.dateExpiration
                       ? `Expire le ${formatDate(document.dateExpiration)}`
                       : 'Aucune date d’expiration renseignée'}
                   </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <Badge ton={tonDepuisJours(jours)}>{libelleEcheance(jours)}</Badge>
-                  <Bouton petit variante="fantome" onClick={() => setEnEdition(document)}>
-                    Modifier
-                  </Bouton>
-                  <Bouton
-                    petit
-                    variante="fantome"
-                    aria-label={`Supprimer ${document.libelle}`}
-                    onClick={() => setASupprimer(document)}
-                  >
-                    <IconePoubelle className="h-4 w-4" />
-                  </Bouton>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Bouton petit variante="fantome" onClick={() => setEnEdition(document)}>
+                      Modifier
+                    </Bouton>
+                    <Bouton
+                      petit
+                      variante="fantome"
+                      aria-label={`Supprimer ${document.libelle}`}
+                      onClick={() => setASupprimer(document)}
+                    >
+                      <IconePoubelle className="h-4 w-4" />
+                    </Bouton>
+                  </div>
                 </div>
               </Carte>
             );
@@ -237,7 +259,9 @@ export function ModuleDocuments() {
                 <Saisie
                   id={id}
                   value={enEdition.note}
-                  onChange={(evenement) => setEnEdition({ ...enEdition, note: evenement.target.value })}
+                  onChange={(evenement) =>
+                    setEnEdition({ ...enEdition, note: evenement.target.value })
+                  }
                 />
               )}
             </Champ>
