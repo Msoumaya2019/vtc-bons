@@ -235,6 +235,22 @@ export function chargeLicence(
   return { sujet: 'Transports Dupont', expiration: '2030-01-01', type: 'abonnement', ...surcharge };
 }
 
+/**
+ * Une date locale à `jours` jours d'aujourd'hui, au format AAAA-MM-JJ.
+ *
+ * Relative, et non figée. `enGrace`, `joursDeGraceRestants` et `estBloque` se jugent contre
+ * l'horloge du jour, sans référence injectable pour les deux derniers : une échéance écrite
+ * en dur ferait passer le test aujourd'hui et échouerait la semaine suivante. Les tests qui
+ * PEUVENT injecter une référence le font, et n'ont pas besoin de cette aide.
+ */
+export function dateIlYA(jours: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() - jours);
+  const mois = String(date.getMonth() + 1).padStart(2, '0');
+  const jour = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${mois}-${jour}`;
+}
+
 /** Une licence valide signée par une paire neuve, prête à être enregistrée. */
 export async function licenceValideTest(
   reference: Date = new Date(),

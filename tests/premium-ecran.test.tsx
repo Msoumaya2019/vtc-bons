@@ -43,6 +43,35 @@ vi.mock('../src/lib/pdf/generate', () => ({
   partagerPdf: vi.fn(),
 }));
 
+/**
+ * Les formules sont rendues PROPOSABLES, avec des liens d'essai.
+ *
+ * Le module réel les tient pour indisponibles tant que les liens de paiement n'ont pas été
+ * collés — c'est voulu, et c'est ce qui empêche un bouton mort de partir en production.
+ * Mais cela rendrait l'écran intestable. On remplace donc la seule DISPONIBILITÉ, en
+ * gardant les prix, les durées et l'arithmétique du module réel : ce qui est éprouvé ici
+ * est l'écran, pas le tarif — celui-ci l'est dans `tests/offres.test.ts`.
+ *
+ * `aucunLien` sert à éprouver l'autre face du garde-fou : quand les liens manquent, aucun
+ * bouton d'achat ne doit apparaître. Le drapeau est remis à faux avant chaque test, sans
+ * quoi un test qui échoue en le laissant levé ferait tomber le suivant.
+ */
+const offresSimulees = vi.hoisted(() => ({ aucunLien: false }));
+
+vi.mock('../src/features/premium/offres', async (importOriginal) => {
+  const reel = await importOriginal<typeof import('../src/features/premium/offres')>();
+  return {
+    ...reel,
+    offresDisponibles: () =>
+      offresSimulees.aucunLien
+        ? []
+        : reel.OFFRES.map((offre) => ({
+            ...offre,
+            lien: `https://buy.stripe.com/essai-${offre.id}`,
+          })),
+  };
+});
+
 import { App } from '../src/App';
 import { db, effacerToutesLesDonnees, getSettings } from '../src/lib/db';
 import { PLAFONDS } from '../src/lib/quota';
@@ -53,6 +82,7 @@ vi.setConfig({ testTimeout: 45_000 });
 
 beforeEach(async () => {
   await effacerToutesLesDonnees();
+  offresSimulees.aucunLien = false;
   window.location.hash = '#/';
 });
 
@@ -216,6 +246,48 @@ describe('page de licence', () => {
 
     const page = await screen.findByTestId('page-licence', {}, { timeout: DELAI });
     expect(page.textContent).toContain(`2 / ${PLAFONDS.bons}`);
+  });
+
+  it('propose les deux formules, avec leur prix et leur lien de paiement', async () => {
+    await monterApplication();
+    await allerA('/licence');
+
+    const offres = await screen.findByTestId('offres', {}, { timeout: DELAI });
+
+    // Les libellés sont produits par le module réel, qui les calcule à partir des centimes :
+    // ce qui est vérifié ici est qu'ils ARRIVENT à l'écran, et que les deux formules sont
+    // annoncées ensemble — le choix, et non un tarif unique, est ce qui a été demandé.
+    expect(offres.textContent).toContain('3,99 € par mois');
+    expect(offres.textContent).toContain('29,99 € par an');
+    // L'argument de la formule longue : son prix ramené au mois, et l'écart avec la courte.
+    expect(offres.textContent).toContain('soit 2,50 € par mois — 37 % de moins');
+
+    const mensuel = screen.getByTestId('offre-mensuel');
+    const annuel = screen.getByTestId('offre-annuel');
+    expect(mensuel.getAttribute('href')).toBe('https://buy.stripe.com/essai-mensuel');
+    expect(annuel.getAttribute('href')).toBe('https://buy.stripe.com/essai-annuel');
+
+    // Le point qui a demandé de lire le code natif de Capacitor : `target="_blank"` emprunte
+    // sur Android le chemin `onCreateWindow`, alors qu'un lien ordinaire est déjà confié au
+    // navigateur système par `launchIntent`. Un `target` ajouté ici ne casserait rien à la
+    // compilation, et ne se verrait qu'au moment où un client a sorti sa carte.
+    expect(mensuel.hasAttribute('target')).toBe(false);
+    expect(annuel.hasAttribute('target')).toBe(false);
+  });
+
+  it('n’affiche aucun bouton d’achat tant qu’aucun lien n’est renseigné', async () => {
+    offresSimulees.aucunLien = true;
+    await monterApplication();
+    await allerA('/licence');
+
+    await screen.findByTestId('page-licence', {}, { timeout: DELAI });
+
+    // Un bouton d'achat qui ne mène nulle part tomberait au moment précis où le client a
+    // sorti sa carte, et passerait pour une panne de l'application plutôt que pour une
+    // configuration inachevée. Mieux vaut ne rien montrer.
+    expect(screen.queryByTestId('offres')).toBeNull();
+    // La saisie du code, elle, reste : c'est le chemin qui fonctionne aujourd'hui.
+    expect(screen.getByRole('button', { name: 'Enregistrer la licence' })).toBeTruthy();
   });
 
   it('refuse un code illisible et n’enregistre RIEN', async () => {

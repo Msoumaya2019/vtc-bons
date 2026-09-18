@@ -7,6 +7,7 @@ import { formatDate } from '../../lib/format';
 import { messageRefus, verifierLicence } from '../../lib/licence';
 import { PLAFONDS, libelleQuota, type TypeQuota } from '../../lib/quota';
 import { useAcces } from '../../context/AccesContext';
+import { economiePourcent, equivalentMensuel, libellePrix, offresDisponibles } from './offres';
 
 const ORDRE: TypeQuota[] = ['bons', 'factures', 'clients'];
 
@@ -28,6 +29,9 @@ export function PageLicence() {
 
   const licence = etat?.licence ?? null;
   const valide = licence?.valide === true;
+
+  const offres = offresDisponibles();
+  const economie = economiePourcent();
 
   const valider = async () => {
     if (!settings) return;
@@ -95,6 +99,49 @@ export function PageLicence() {
           </ul>
         </Carte>
       )}
+
+      {!valide && offres.length > 0 ? (
+        <Carte className="space-y-3" data-testid="offres">
+          <h2 className="section-titre">Débloquer l’application</h2>
+          <p className="texte-muet">
+            Les plafonds sont levés dès le paiement, pour toute la durée payée. Le règlement se fait
+            chez Stripe, dans votre navigateur : aucune donnée bancaire ne passe par l’application.
+          </p>
+          {/*
+            Un lien ORDINAIRE, et surtout pas `target="_blank"`. Vérifié dans le code natif
+            de Capacitor installé : sur Android, `launchIntent` ouvre dans le navigateur
+            système tout hôte étranger à l’application ; sur iOS, `decidePolicyFor` fait de
+            même dès que la navigation est de premier niveau — ce qu’un lien ordinaire est
+            déjà. `target="_blank"` emprunte en revanche, sur Android, le chemin
+            `onCreateWindow`, qu’il n’y a aucune raison d’aller éprouver.
+          */}
+          <div className="space-y-3">
+            {offres.map((offre) => {
+              const equivalent = equivalentMensuel(offre);
+              return (
+                <div key={offre.id} className="space-y-1">
+                  <a
+                    href={offre.lien}
+                    data-testid={`offre-${offre.id}`}
+                    className="btn btn-primaire w-full"
+                  >
+                    {libellePrix(offre)}
+                  </a>
+                  {equivalent ? (
+                    <p className="texte-muet text-center">
+                      soit {equivalent}
+                      {economie !== null ? ` — ${economie} % de moins` : ''}
+                    </p>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+          <p className="texte-muet">
+            Le code de déblocage vous est transmis après le paiement, et se saisit ci-dessous.
+          </p>
+        </Carte>
+      ) : null}
 
       <Carte className="space-y-3">
         <h2 className="section-titre">Saisir un code de licence</h2>

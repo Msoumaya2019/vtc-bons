@@ -6,8 +6,14 @@
  * `.gitignore` écarte du dépôt.
  *
  * Exemples :
- *   node scripts/delivrer-licence.mjs --sujet "Transports Dupont" --jours 30
- *   node scripts/delivrer-licence.mjs --sujet "Mon appareil" --jours 3650 --type developpeur
+ *   node scripts/delivrer-licence.mjs --sujet "Transports Dupont" --formule mensuel
+ *   node scripts/delivrer-licence.mjs --sujet "Transports Dupont" --formule annuel
+ *   node scripts/delivrer-licence.mjs --sujet "Mon appareil" --jours 7300 --type developpeur
+ *
+ * `--formule` est préféré à `--jours` pour un client : la durée vient alors de
+ * `src/features/premium/offres.ts`, la même que celle annoncée à l'achat. Recopier « 31 »
+ * ici donnerait, au premier changement de tarif, un an signé à un abonné mensuel — et rien
+ * ne le signalerait avant que le client ne s'en aperçoive, en mieux.
  *
  * La date d'expiration est calculée en heure LOCALE, comme `joursRestants()` dans
  * `src/lib/format.ts` : un calcul en UTC décalerait d'un jour selon le fuseau, et un
@@ -17,6 +23,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { lireFormules } from './formules-licence.mjs';
 
 const ICI = dirname(fileURLToPath(import.meta.url));
 const FICHIER_PRIVE = join(ICI, 'cle-licence-privee.jwk.json');
@@ -70,9 +77,39 @@ if (type !== 'abonnement' && type !== 'developpeur') {
   process.exit(1);
 }
 
-const jours = typeof args.jours === 'string' ? Number(args.jours) : NaN;
+let formules;
+try {
+  formules = lireFormules();
+} catch (erreur) {
+  console.error(erreur instanceof Error ? erreur.message : String(erreur));
+  console.error('Refus de délivrer à l’aveugle : la durée doit venir d’une source sûre.');
+  process.exit(1);
+}
+
+const formule = typeof args.formule === 'string' ? args.formule : null;
+
+if (formule !== null && typeof args.jours === 'string') {
+  console.error('--formule et --jours s’excluent : la durée doit venir d’un seul endroit.');
+  process.exit(1);
+}
+
+let jours;
+if (formule !== null) {
+  if (!Object.hasOwn(formules, formule)) {
+    console.error(
+      `--formule doit valoir ${Object.keys(formules).join(' ou ')}, reçu « ${formule} ».`,
+    );
+    process.exit(1);
+  }
+  jours = formules[formule];
+} else {
+  jours = typeof args.jours === 'string' ? Number(args.jours) : NaN;
+}
+
 if (!Number.isInteger(jours) || jours < 0) {
-  console.error('--jours est obligatoire et doit être un entier positif ou nul.');
+  console.error('--formule ou --jours est obligatoire.');
+  console.error(`  --formule ${Object.keys(formules).join(' | ')}   (durée lue dans offres.ts)`);
+  console.error('  --jours <entier>          (durée libre, pour une licence de développement)');
   process.exit(1);
 }
 

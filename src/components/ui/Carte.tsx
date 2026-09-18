@@ -1,8 +1,25 @@
 import { useState } from 'react';
-import type { ReactNode } from 'react';
+import type { HTMLAttributes, ReactNode } from 'react';
 
-export function Carte({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <div className={`carte ${className}`}>{children}</div>;
+/**
+ * Les attributs restants sont TRANSMIS au `div`, et non avalés.
+ *
+ * Ce n'est pas du confort. Un attribut à tiret — `data-*`, `aria-*` — échappe au contrôle
+ * de type de TypeScript : la règle du langage est qu'un nom d'attribut qui n'est pas un
+ * identifiant valide n'est pas cherché dans le type des propriétés. Mesuré, plutôt que
+ * supposé : `<Carte data-testid="x">` compile sans un mot, alors que `<Carte truc="x">`
+ * donne un TS2322.
+ *
+ * Autrement dit, ce composant pouvait avaler un `data-testid` en silence — et un test qui
+ * l'aurait cherché aurait échoué sur un écran pourtant correct, ou pire, un test qui ne
+ * l'aurait pas cherché aurait laissé passer un écran faux sans rien dire.
+ */
+export function Carte({ children, className = '', ...reste }: HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={`carte ${className}`} {...reste}>
+      {children}
+    </div>
+  );
 }
 
 export type Ton = 'neutre' | 'succes' | 'attention' | 'danger' | 'accent';

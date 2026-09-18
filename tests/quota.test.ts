@@ -22,13 +22,16 @@ import {
   etatQuota,
   verifierPlafond,
 } from '../src/lib/quota';
-import { etatAcces, verifierAcces } from '../src/lib/acces';
+import { enGrace, etatAcces, joursDeGraceRestants, verifierAcces } from '../src/lib/acces';
+import { estBloque } from '../src/context/AccesContext';
+import { verifierLicence } from '../src/lib/licence';
 import { emettreBon } from '../src/features/bons/service';
 import {
   bonTest,
   chargeLicence,
   clePubliqueDe,
   clientTest,
+  dateIlYA,
   engendrerPaire,
   factureTest,
   licenceValideTest,
@@ -246,6 +249,117 @@ describe('verifierAcces', () => {
     await expect(verifierAcces('bons', { clePublique: await clePubliqueDe(vrai) })).rejects.toThrow(
       ErreurQuota,
     );
+  });
+});
+
+describe('grâce après échéance', () => {
+  /**
+   * Un abonnement se renouvelle par un paiement qui met un à trois jours ouvrés à
+   * apparaître, et le jeton qui suit arrive par courriel, pendant que le chauffeur
+   * conduit. Couper le jour même où la date passe punirait un client à jour pour un retard
+   * qui ne vient pas de lui — et c'est le client qui paie qu'on perdrait.
+   *
+   * La date d'échéance est volontairement ancienne par rapport à la date de référence,
+   * pour que ces tests ne dépendent pas du jour où on les exécute.
+   */
+  const ECHEANCE = '2026-01-10';
+
+  async function licenceEchue() {
+    const paire = await engendrerPaire();
+    const jeton = await signerLicence(chargeLicence({ expiration: ECHEANCE }), paire.privateKey);
+    await saveSettings({ ...reglagesTest(), licence: jeton });
+    return clePubliqueDe(paire);
+  }
+
+  it('compte les jours restants de 3 à 1, puis s’arrête net', async () => {
+    const paire = await engendrerPaire();
+    const jeton = await signerLicence(chargeLicence({ expiration: ECHEANCE }), paire.privateKey);
+    const clePublique = await clePubliqueDe(paire);
+
+    /**
+     * La référence est passée DES DEUX CÔTÉS, et c'est le point de ce test.
+     *
+     * `verifierLicence` la reçoit pour juger la licence ; `enGrace` et
+     * `joursDeGraceRestants` en ont une AUSSI, qui vaut l'horloge du jour par défaut. Ne la
+     * passer qu'à la première fait juger l'échéance à la date du test et la grâce à la date
+     * du jour : les deux moitiés de la même règle se contredisent alors sans que rien ne le
+     * signale, et le test mesure un désaccord au lieu de la règle.
+     */
+    const reference = (jour: number) => new Date(2026, 0, jour);
+    const etat = async (jour: number) =>
+      verifierLicence(jeton, { clePublique, reference: reference(jour) });
+
+    // Le 10 est le DERNIER jour couvert : rien n'est échu, donc aucune grâce n'est ouverte.
+    // La borne compte autant que le reste — une grâce qui s'ouvrirait un jour trop tôt
+    // offrirait un jour gratuit à chaque échéance.
+    expect(enGrace(await etat(10), reference(10))).toBe(false);
+    expect(joursDeGraceRestants(await etat(10), reference(10))).toBeNull();
+
+    expect(joursDeGraceRestants(await etat(11), reference(11))).toBe(3);
+    expect(joursDeGraceRestants(await etat(12), reference(12))).toBe(2);
+    expect(joursDeGraceRestants(await etat(13), reference(13))).toBe(1);
+    expect(joursDeGraceRestants(await etat(14), reference(14))).toBeNull();
+
+    expect(enGrace(await etat(11), reference(11))).toBe(true);
+    expect(enGrace(await etat(13), reference(13))).toBe(true);
+    expect(enGrace(await etat(14), reference(14))).toBe(false);
+  });
+
+  it('laisse créer pendant la grâce, et refuse au quatrième jour', async () => {
+    await semerBons(PLAFONDS.bons);
+    const clePublique = await licenceEchue();
+
+    for (const jour of [11, 12, 13]) {
+      await expect(
+        verifierAcces('bons', { clePublique, reference: new Date(2026, 0, jour) }),
+      ).resolves.toBeUndefined();
+    }
+
+    await expect(
+      verifierAcces('bons', { clePublique, reference: new Date(2026, 0, 14) }),
+    ).rejects.toThrow(ErreurQuota);
+  });
+
+  it('n’ouvre aucune grâce pour une licence absente : elle n’a jamais rien ouvert', async () => {
+    await semerBons(PLAFONDS.bons);
+    await expect(verifierAcces('bons')).rejects.toThrow(ErreurQuota);
+  });
+
+  /**
+   * L'accord entre les deux moitiés de la même règle.
+   *
+   * `estBloque` décide de ce que l'ÉCRAN montre, `verifierAcces` de ce que le SERVICE
+   * accepte. Ce sont deux fonctions distinctes, et c'est là que le désaccord se logerait :
+   * un panneau de refus affiché devant une création qui fonctionne, ou l'inverse — une
+   * création proposée qui échoue à l'enregistrement.
+   *
+   * Les échéances sont RELATIVES au jour de l'exécution, et c'est forcé : `estBloque` lit
+   * l'horloge elle-même et n'accepte aucune référence. Une date figée ferait passer ce test
+   * le jour où on l'écrit et échouerait la semaine suivante — le contraire de ce qu'on veut
+   * prouver.
+   */
+  it('l’écran et le service s’accordent sur la grâce', async () => {
+    await semerBons(PLAFONDS.bons);
+
+    const paire = await engendrerPaire();
+    const clePublique = await clePubliqueDe(paire);
+    const licenceEchueDepuis = async (jours: number) => {
+      const jeton = await signerLicence(
+        chargeLicence({ expiration: dateIlYA(jours) }),
+        paire.privateKey,
+      );
+      await saveSettings({ ...reglagesTest(), licence: jeton });
+    };
+
+    // Échue depuis deux jours : la grâce court, les deux doivent laisser passer.
+    await licenceEchueDepuis(2);
+    expect(estBloque(await etatAcces({ clePublique }), 'bons')).toBe(false);
+    await expect(verifierAcces('bons', { clePublique })).resolves.toBeUndefined();
+
+    // Échue depuis quatre jours : la grâce est finie, les deux doivent refuser.
+    await licenceEchueDepuis(4);
+    expect(estBloque(await etatAcces({ clePublique }), 'bons')).toBe(true);
+    await expect(verifierAcces('bons', { clePublique })).rejects.toThrow(ErreurQuota);
   });
 });
 
