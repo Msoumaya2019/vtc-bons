@@ -13,6 +13,9 @@ import { ListeFactures } from './features/factures/ListeFactures';
 import { DetailFacture } from './features/factures/DetailFacture';
 import { PageClients } from './features/clients/PageClients';
 import { PageReglages } from './features/reglages/PageReglages';
+import { PageLicence } from './features/premium/PageLicence';
+import { GardeCreation } from './features/premium/GardeCreation';
+import { FournisseurAcces } from './context/AccesContext';
 import { PageAide } from './pages/PageAide';
 
 function Chargement() {
@@ -42,13 +45,31 @@ function Application() {
 
       <Route element={<Layout />}>
         <Route path="/" element={<Navigate to="/nouveau" replace />} />
-        <Route path="/nouveau" element={<NouveauBon />} />
-        <Route path="/instantane" element={<PageInstantane />} />
+        {/* Les deux écrans de CRÉATION passent par la garde. Ceux de consultation —
+            bons, factures, clients, réglages — n'y passent pas : atteindre un plafond
+            ne doit jamais rendre inaccessible un document déjà émis. */}
+        <Route
+          path="/nouveau"
+          element={
+            <GardeCreation type="bons">
+              <NouveauBon />
+            </GardeCreation>
+          }
+        />
+        <Route
+          path="/instantane"
+          element={
+            <GardeCreation type="bons">
+              <PageInstantane />
+            </GardeCreation>
+          }
+        />
         <Route path="/bons" element={<ListeBons />} />
         <Route path="/bons/:bonId" element={<DetailBon />} />
         <Route path="/factures" element={<ListeFactures />} />
         <Route path="/factures/:factureId" element={<DetailFacture />} />
         <Route path="/clients" element={<PageClients />} />
+        <Route path="/licence" element={<PageLicence />} />
         <Route path="/reglages" element={<PageReglages />} />
         <Route path="/aide" element={<PageAide />} />
         <Route path="*" element={<Navigate to="/nouveau" replace />} />
@@ -70,7 +91,12 @@ export function App() {
                 arriverait après la redirection de la racine, et le chauffeur verrait
                 apparaître l'assistant de création avant l'onglet qu'il a demandé. */}
             <EcouteLienProfond />
-            <Application />
+            {/* L'état d'accès est fourni ICI, à l'intérieur du routeur : il se relit à
+                chaque changement d'adresse, ce qui dispense les écrans de prévenir
+                qui que ce soit après une émission. */}
+            <FournisseurAcces>
+              <Application />
+            </FournisseurAcces>
           </HashRouter>
         </FournisseurClients>
       </FournisseurReglages>

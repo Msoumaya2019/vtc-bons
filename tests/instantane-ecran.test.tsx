@@ -45,6 +45,7 @@ import { db, effacerToutesLesDonnees, saveSettings } from '../src/lib/db';
 import { FournisseurToast } from '../src/components/ui/Toast';
 import { FournisseurReglages } from '../src/context/ReglagesContext';
 import { FournisseurClients } from '../src/context/ClientsContext';
+import { FournisseurAcces } from '../src/context/AccesContext';
 import { PageInstantane } from '../src/features/bons/PageInstantane';
 import { PageClients } from '../src/features/clients/PageClients';
 import { clientInstantaneTest, clientTest, profilInstantane, reglagesTest } from './aides';
@@ -308,16 +309,29 @@ describe('PageInstantane', () => {
   });
 });
 
-/** La fiche client, avec ses fournisseurs. Elle n'utilise pas de routeur. */
+/**
+ * La fiche client, avec ses fournisseurs.
+ *
+ * Le routeur n'est pas décoratif. La fiche juge désormais le plafond À L'OUVERTURE du
+ * formulaire, et ce verdict vient du fournisseur d'accès, qui relit l'état à chaque
+ * changement d'adresse — il lui faut donc une adresse. Le montage échouait sans lui,
+ * et c'est une bonne nouvelle : le harnais disait « pas de routeur » du temps où la
+ * fiche ne jugeait rien, et il fallait que cela se voie tout de suite plutôt que de
+ * laisser croire que la fiche se teste seule.
+ */
 function HarnaisClients() {
   return (
-    <FournisseurToast>
-      <FournisseurReglages>
-        <FournisseurClients>
-          <PageClients />
-        </FournisseurClients>
-      </FournisseurReglages>
-    </FournisseurToast>
+    <MemoryRouter>
+      <FournisseurToast>
+        <FournisseurReglages>
+          <FournisseurAcces>
+            <FournisseurClients>
+              <PageClients />
+            </FournisseurClients>
+          </FournisseurAcces>
+        </FournisseurReglages>
+      </FournisseurToast>
+    </MemoryRouter>
   );
 }
 

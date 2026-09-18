@@ -11,6 +11,7 @@ import { db } from '../../lib/db';
 import { identifiant, journaliser } from '../../lib/audit';
 import { optionsDepuisSettings, prochainNumero } from '../../lib/numbering';
 import { ajouterJours, dateLocaleISO } from '../../lib/format';
+import { verifierAcces } from '../../lib/acces';
 import { calculerTotaux, mentionTVA } from '../../lib/tva';
 import { snapshotClient, snapshotEmetteur } from '../../lib/snapshots';
 import { genererEtStockerPdfFacture } from '../../lib/pdf/generate';
@@ -98,6 +99,12 @@ export async function creerFactureDepuisBon(
     throw new Error('Le bon doit être émis avant de pouvoir être facturé.');
   }
 
+  // Après les conditions qui portent sur le BON, et avant toute construction : si ce bon
+  // n'est pas facturable, le dire précisément est plus utile que d'annoncer un plafond.
+  // Avant `prochainNumero`, en revanche, sans quoi un refus brûlerait un numéro et
+  // laisserait un trou dans la séquence.
+  await verifierAcces('factures');
+
   const dateEmission = options.dateEmission ?? dateLocaleISO();
   const datePrestation = options.datePrestation ?? bon.datePriseEnCharge ?? dateEmission;
   const dateEcheance = ajouterJours(dateEmission, settings.delaiPaiementJours || 0);
@@ -176,6 +183,10 @@ export async function creerFactureLibre(
   settings: Settings,
   options: { dateEmission?: string; datePrestation?: string; remiseGlobale?: Bon['remiseGlobale'] } = {},
 ): Promise<Facture> {
+  // Une facture libre n'a aucune condition préalable : le plafond se vérifie donc
+  // d'entrée, et avant `prochainNumero` — un refus ne doit consommer aucun numéro.
+  await verifierAcces('factures');
+
   const dateEmission = options.dateEmission ?? dateLocaleISO();
   const datePrestation = options.datePrestation ?? dateEmission;
   const dateEcheance = ajouterJours(dateEmission, settings.delaiPaiementJours || 0);

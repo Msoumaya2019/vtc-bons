@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useClients } from '../../context/ClientsContext';
 import { useReglages } from '../../context/ReglagesContext';
+import { estBloque, useAcces } from '../../context/AccesContext';
 import { useToast } from '../../components/ui/Toast';
 import { Badge, Carte, EtatVide } from '../../components/ui/Carte';
 import { Bouton } from '../../components/ui/Bouton';
@@ -15,6 +16,7 @@ import {
 } from '../../components/ui/Champ';
 import { ChampAdresse } from '../../components/ui/ChampAdresse';
 import { DialogueConfirmation, Modale } from '../../components/ui/Modale';
+import { EcranPlafond } from '../premium/GardeCreation';
 import { IconeClients, IconePlus, IconePoubelle, IconeRecherche } from '../../components/icons';
 import { adresseSurUneLigne, clientVide } from '../../lib/snapshots';
 import { validerEmail, validerSiret, validerTelephone, validerTvaIntracom } from '../../lib/validation';
@@ -43,11 +45,13 @@ type Erreurs = Partial<Record<'nom' | 'telephone' | 'email' | 'siret' | 'numeroT
 export function PageClients() {
   const { clients, creer, modifier, supprimer, definirParDefaut, chargement } = useClients();
   const { settings } = useReglages();
+  const { etat } = useAcces();
   const toast = useToast();
   const [recherche, setRecherche] = useState('');
   const [enEdition, setEnEdition] = useState<Client | null>(null);
   const [erreurs, setErreurs] = useState<Erreurs>({});
   const [aSupprimer, setASupprimer] = useState<Client | null>(null);
+  const [plafondOuvert, setPlafondOuvert] = useState(false);
 
   const filtres = useMemo(() => {
     const terme = recherche.trim().toLowerCase();
@@ -61,6 +65,17 @@ export function PageClients() {
   }, [clients, recherche]);
 
   const ouvrirNouveau = () => {
+    // Le plafond se juge à l'OUVERTURE du formulaire, jamais sur la route : `/clients`
+    // porte aussi la liste, et la bloquer entière priverait le chauffeur de ses clients
+    // existants — la consultation ne consomme rien et doit rester libre à vie.
+    //
+    // Sans ce contrôle, il ouvrirait une fenêtre dont le bouton « Enregistrer » échouerait
+    // en silence apparent : le service refuse bien l'écriture, mais un refus qui arrive
+    // après coup n'explique rien.
+    if (estBloque(etat, 'clients')) {
+      setPlafondOuvert(true);
+      return;
+    }
     setErreurs({});
     setEnEdition(clientVide());
   };
@@ -88,8 +103,16 @@ export function PageClients() {
       return;
     }
     if (enEdition.id === '') {
-      await creer(enEdition);
-      toast.succes('Client créé.');
+      try {
+        await creer(enEdition);
+        toast.succes('Client créé.');
+      } catch (erreur) {
+        // Le refus d'accès arrive par ici, et c'est attendu. Sans ce bloc, il deviendrait
+        // une promesse rejetée sans témoin : la fenêtre resterait ouverte et le chauffeur
+        // ne verrait RIEN. Le message du service est déjà rédigé pour être lu tel quel.
+        toast.erreur(erreur instanceof Error ? erreur.message : 'Création impossible.');
+        return;
+      }
     } else {
       await modifier(enEdition);
       toast.succes('Client modifié.');
@@ -553,6 +576,19 @@ export function PageClients() {
             ) : null}
           </>
         ) : null}
+      </Modale>
+
+      <Modale
+        ouverte={plafondOuvert}
+        titre="Plafond atteint"
+        onFermer={() => setPlafondOuvert(false)}
+        actions={
+          <Bouton variante="secondaire" onClick={() => setPlafondOuvert(false)}>
+            Fermer
+          </Bouton>
+        }
+      >
+        <EcranPlafond type="clients" />
       </Modale>
 
       <DialogueConfirmation

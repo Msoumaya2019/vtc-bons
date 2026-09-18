@@ -18,6 +18,12 @@ dist-ssr/
 *.mobileprovision
 *.cer
 
+# Licences : la clé PRIVÉE signe, elle ne quitte pas la machine qui délivre. La clé
+# publique, elle, est publiée dans `src/lib/licence.ts` — c'est tout le principe.
+# Le motif est ancré et porte le nom exact : un `*.json` trop large écarterait des
+# fichiers de configuration du dépôt sans qu'on s'en aperçoive.
+/scripts/cle-licence-privee.jwk.json
+
 # Plateformes natives générées par la CI (Capacitor).
 # L'ancre « / » n'est pas décorative : sans elle, « android/ » correspondrait à TOUT
 # dossier de ce nom, y compris `native/android/` — où vivent justement les fragments XML

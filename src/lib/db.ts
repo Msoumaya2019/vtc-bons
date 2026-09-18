@@ -116,6 +116,10 @@ export function parametresParDefaut(): Settings {
     antedatationReservationMinutes: 0,
 
     derniereSauvegarde: null,
+
+    // Aucune licence au premier lancement : l'application démarre en version d'essai,
+    // avec ses plafonds. Voir `src/lib/quota.ts` et `src/lib/acces.ts`.
+    licence: '',
   };
 }
 

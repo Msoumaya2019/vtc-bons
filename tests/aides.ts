@@ -193,3 +193,54 @@ export function factureTest(surcharge: Partial<Facture> = {}): Facture {
     ...surcharge,
   };
 }
+
+/**
+ * Aides de licence.
+ *
+ * Elles engendrent leur propre paire au lieu d'employer celle du dépôt : la clé privée
+ * est écartée par `.gitignore`, donc absente sur toute autre machine, et un test qui en
+ * dépendrait échouerait au premier clone.
+ *
+ * `btoa` plutôt que `Buffer` : les tests s'exécutent dans jsdom, où l'encodage doit
+ * rester celui qu'un navigateur sait faire — c'est précisément ce que l'application
+ * utilisera pour lire une licence.
+ */
+export function base64Url(octets: Uint8Array): string {
+  let binaire = '';
+  for (const octet of octets) binaire += String.fromCharCode(octet);
+  return btoa(binaire).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+export async function engendrerPaire(): Promise<CryptoKeyPair> {
+  return crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+}
+
+export async function clePubliqueDe(paire: CryptoKeyPair): Promise<string> {
+  return base64Url(new Uint8Array(await crypto.subtle.exportKey('raw', paire.publicKey)));
+}
+
+/** Signe une charge comme le fera le serveur de licences. */
+export async function signerLicence(charge: unknown, clePrivee: CryptoKey): Promise<string> {
+  const octets = new TextEncoder().encode(JSON.stringify(charge));
+  const signature = new Uint8Array(
+    await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, clePrivee, octets),
+  );
+  return `${base64Url(octets)}.${base64Url(signature)}`;
+}
+
+/** Charge de licence complète, valable loin devant. */
+export function chargeLicence(
+  surcharge: Partial<{ sujet: string; expiration: string; type: string }> = {},
+): Record<string, unknown> {
+  return { sujet: 'Transports Dupont', expiration: '2030-01-01', type: 'abonnement', ...surcharge };
+}
+
+/** Une licence valide signée par une paire neuve, prête à être enregistrée. */
+export async function licenceValideTest(
+  reference: Date = new Date(),
+): Promise<{ jeton: string; clePublique: string }> {
+  const paire = await engendrerPaire();
+  const expiration = `${reference.getFullYear() + 1}-01-01`;
+  const jeton = await signerLicence(chargeLicence({ expiration }), paire.privateKey);
+  return { jeton, clePublique: await clePubliqueDe(paire) };
+}

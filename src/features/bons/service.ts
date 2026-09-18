@@ -16,6 +16,7 @@ import { identifiant, journaliser } from '../../lib/audit';
 import { optionsDepuisSettings, prochainNumero } from '../../lib/numbering';
 import { snapshotClient, snapshotEmetteur } from '../../lib/snapshots';
 import { dateLocaleISO, heureLocale } from '../../lib/format';
+import { verifierAcces } from '../../lib/acces';
 import { blocages, verifierConformiteBon } from './conformite';
 import { genererEtStockerPdfBon } from '../../lib/pdf/generate';
 import type { Bon, Client, LignePrestation, Settings } from '../../types';
@@ -120,6 +121,15 @@ export async function emettreBon(
 ): Promise<Bon> {
   const bon = await db.bons.get(bonId);
   if (!bon) throw new Error('Bon introuvable.');
+
+  // AVANT tout le reste, et donc avant `prochainNumero`. Un plafond atteint ne doit
+  // consommer AUCUN numéro : la séquence légale ne porte pas de trou pour un document
+  // qui n'a pas été émis. Placé plus bas, ce contrôle perdrait un rang à chaque refus.
+  //
+  // Il passe aussi avant le contrôle de conformité, et c'est délibéré : il est plus
+  // utile de dire au chauffeur qu'il a épuisé ses bons que de lui demander de corriger
+  // un document qu'il n'a pas le droit d'émettre de toute façon.
+  await verifierAcces('bons');
 
   const problemes = verifierConformiteBon(bon, settings, client);
   const bloquants = blocages(problemes);

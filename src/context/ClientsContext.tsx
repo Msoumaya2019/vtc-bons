@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from 'react';
 import { db } from '../lib/db';
 import { identifiant, journaliser } from '../lib/audit';
+import { verifierAcces } from '../lib/acces';
 import { clientVide, normaliserClient } from '../lib/snapshots';
 import type { Client } from '../types';
 
@@ -59,6 +60,9 @@ export function FournisseurClients({ children }: { children: ReactNode }) {
 
   const creer = useCallback<ContexteClients['creer']>(
     async (donnees) => {
+      // Avant toute construction : un client refusé ne doit rien laisser derrière lui.
+      await verifierAcces('clients');
+
       const base = clientVide();
       const client: Client = {
         ...base,

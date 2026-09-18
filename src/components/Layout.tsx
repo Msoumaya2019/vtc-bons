@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
+import { BandeauEssai } from '../features/premium/BandeauEssai';
 import {
   IconeBons,
   IconeClients,
@@ -38,6 +39,9 @@ export function Layout() {
             Aide et conformité
           </NavLink>
         </div>
+        {/* Dans l'en-tête, donc visible depuis TOUS les onglets : un décompte qu'il
+            faudrait aller chercher dans les Réglages ne préviendrait personne. */}
+        <BandeauEssai />
       </header>
 
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-4 pb-28">

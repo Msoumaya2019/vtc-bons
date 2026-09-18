@@ -237,6 +237,19 @@ export interface Settings {
   antedatationReservationMinutes: number;
 
   derniereSauvegarde: string | null;
+
+  /**
+   * Jeton de licence signé, ou chaîne vide.
+   *
+   * Il vit dans les réglages, et non dans une table à part, pour une raison pratique :
+   * il suit ainsi la sauvegarde. Un chauffeur qui restaure son archive retrouve son
+   * droit sans avoir à ressaisir quoi que ce soit.
+   *
+   * Il est lu DÉFENSIVEMENT comme tout champ de `Settings` : la restauration d'une
+   * sauvegarde écrit l'archive telle quelle, donc un champ absent vaut réellement
+   * `undefined` — d'où le `?? ''` au moment de la vérification.
+   */
+  licence: string;
 }
 
 export interface EntreeHistorique {
