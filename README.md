@@ -192,6 +192,93 @@ le document, lui, reste dans la base de l'application.
 
 ---
 
+## Version d'essai, licence et abonnement
+
+L'application s'essaie sans rien créer de plus : les dix premiers bons de commande, les dix
+premières factures et les dix premiers clients sont libres. Au-delà, la **création** s'arrête —
+mais rien n'est jamais supprimé, et rien de ce qui a déjà été émis ne devient inaccessible.
+
+Ce plafond n'est pas une serrure, et il vaut mieux le savoir avant d'y consacrer du temps :
+l'application ne parle à aucun serveur, donc rien ne peut vérifier de l'extérieur qu'un droit a
+été payé. C'est une règle de bonne foi, et le contournement le moins cher est d'éditer une
+sauvegarde, qui est du JSON lisible.
+
+### Ce qui reste gratuit pour toujours
+
+Le plafond ne porte que sur la création. Consulter les documents, les imprimer en PDF, corriger un
+document déjà émis, exporter et sauvegarder restent possibles sans limite, licence ou pas. Ce
+n'est pas une faveur commerciale : l'application détient la **seule copie** des factures émises —
+le PDF vit dans IndexedDB, pas dans les fichiers du téléphone. Un verrou qui les rendrait
+inaccessibles ne dirait pas « vous ne pouvez plus créer », il dirait « vous avez perdu vos
+factures ».
+
+### Ce qui est compté, et pourquoi ainsi
+
+- **Un bon portant un numéro**, jamais un brouillon : un brouillon n'a pas de numéro par
+  construction, donc un document abandonné ne laisse aucun trou dans la séquence légale.
+- **Un bon déjà facturé compte encore** : le statut ne peut pas servir de critère, puisqu'un bon
+  facturé quitte le statut « émis » — compter par statut permettrait d'émettre sans fin.
+- **Une facture, mais pas un avoir** : un avoir corrige une facture, le compter punirait la
+  correction d'une erreur.
+- **Un client enregistré, mais pas un client supprimé** : une fiche saisie par erreur ne doit pas
+  coûter un rang.
+
+Le total n'est **jamais** lu dans les compteurs (`db.compteurs`) : le réglage de remise à zéro
+annuelle y est actif par défaut, et l'essai serait éternel. Les trois plafonds sont comptés
+**séparément** — un compteur commun empêcherait de facturer des bons déjà émis, ce qui n'est plus
+une limite commerciale mais un problème légal.
+
+### La licence, et la clé qui la crée
+
+Un code de licence est une charge utile signée en **ECDSA P-256**, vérifiée par Web Crypto :
+aucune dépendance ajoutée, et rien ne quitte l'appareil. La **clé publique** est publiée dans
+`src/lib/licence.ts` ; la **clé privée** vit dans `scripts/cle-licence-privee.jwk.json`, écartée
+du dépôt par `.gitignore`.
+
+> **À sauvegarder vous-même, et à ne jamais publier.** La clé privée n'est pas dans ce dépôt, et
+> c'est délibéré : elle est le seul secret du projet. Perdue, elle ne se retrouve pas — les
+> licences déjà délivrées resteraient valables, mais plus aucune nouvelle ne pourrait être signée.
+> De même, engendrer une nouvelle paire invalide toutes les licences déjà délivrées, puisque la
+> clé publique embarquée change.
+
+```bash
+node scripts/generer-cles-licence.mjs                                  # engendre une paire, si besoin
+node scripts/delivrer-licence.mjs --sujet "Nom du client" --formule mensuel
+node scripts/delivrer-licence.mjs --sujet "Nom du client" --formule annuel
+node scripts/delivrer-licence.mjs --sujet "Poste de développement" --jours 7300 --type developpeur
+```
+
+`--formule` lit la durée dans `src/features/premium/offres.ts`, la même que celle annoncée à
+l'achat. Recopier « 31 » sur la ligne de commande donnerait, au premier changement de tarif, un an
+signé à un abonné mensuel — et rien ne le signalerait avant que le client ne s'en aperçoive.
+
+### L'abonnement, et la grâce de trois jours
+
+Deux formules sont proposées — **3,99 € par mois**, **29,99 € par an** — chacune menant à un lien
+de paiement Stripe ouvert dans le navigateur : aucune donnée bancaire ne passe par l'application,
+et aucune requête n'est ajoutée. Les prix vivent en centimes dans `src/features/premium/offres.ts`,
+et tout ce qui s'affiche en dérive — le prix au mois équivalent comme le pourcentage d'économie.
+Un « −37 % » écrit à la main deviendrait faux au premier changement de tarif sans que rien ne le
+signale.
+
+Ces valeurs sont **cuites dans le binaire** : changer un tarif demande une nouvelle compilation
+et, le paquet s'installant à la main, que chaque client réinstalle. Tant que les deux liens de
+paiement sont vides, la carte d'achat ne s'affiche pas — un bouton qui ne mène nulle part tombe au
+moment précis où le client a sorti sa carte, et passe pour une panne de l'application plutôt que
+pour une configuration inachevée.
+
+Un abonnement échu laisse **trois jours** de fonctionnement normal, tous plafonds levés : un
+paiement met un à trois jours ouvrés à apparaître, et le jeton qui suit arrive par courriel,
+pendant que le chauffeur conduit. Couper le jour où la date passe punirait un client à jour pour un
+retard qui ne vient pas de lui. Pendant ces trois jours, le bandeau annonce « Abonnement échu —
+N jours pour renouveler » plutôt que des compteurs, qui seraient faux et alarmants.
+
+Le renouvellement est **manuel** : il faut signer un jeton par mois et par client. Au-delà de
+quelques dizaines d'abonnés, il faudra automatiser la signature — le point délicat n'est pas
+d'encaisser, c'est de signer.
+
+---
+
 ## Démarrage rapide
 
 Prérequis : [Node.js](https://nodejs.org/) **22.22.2 ou plus récent** (c'est la version
@@ -226,8 +313,11 @@ Le guide pas à pas, sans ligne de commande, se trouve dans **[SETUP.md](SETUP.m
 | `npm run typecheck` | Vérification des types seule |
 | `npm run format` | Mise en forme automatique |
 | `npm run icons` | Régénère les icônes de l'application |
+| `node scripts/generer-cles-licence.mjs` | Engendre la paire de clés qui signe les licences — à exécuter **une seule fois** |
+| `node scripts/delivrer-licence.mjs --sujet "…" --formule mensuel` | Signe un code de licence, dont la durée vient de `offres.ts` |
 | `npm run verifier:binaires` | Vérifie que les binaires natifs de Rollup suivent sa version |
 | `npm run verifier:raccourci` | Vérifie le raccourci d'écran d'accueil dans le manifeste publié, et l'accord du schéma d'adresse `vtcbons` entre l'application et ses quatre déclarations natives |
+| `npm run verifier:flux` | Analyse les quatre flux de travail de `.github/workflows/` : chaque script `run` est passé à `bash -n`, et les déclarations sont confrontées à ce que le dépôt contient réellement. Il existe parce qu'une étape qui ne s'exécute que sur un exécuteur distant ne se voit pas en local |
 | `npm run cap:android` | Ouvre le projet Android dans Android Studio |
 | `npm run cap:ios` | Ouvre le projet iOS dans Xcode |
 
@@ -235,7 +325,7 @@ Le guide pas à pas, sans ligne de commande, se trouve dans **[SETUP.md](SETUP.m
 
 ## Ce que les tests vérifient
 
-438 tests, répartis en vingt-deux fichiers. Ils ne mesurent pas la quantité de code, mais les
+509 tests, répartis en vingt-sept fichiers. Ils ne mesurent pas la quantité de code, mais les
 endroits où une erreur coûte cher.
 
 | Fichier | Ce qu'il protège |
@@ -258,6 +348,7 @@ endroits où une erreur coûte cher.
 | `app.test.tsx` | Le démarrage réel de l'application : montage, routage, charte, mode contrôle, et le repère de version des Réglages — sans lui, un essai sur le téléphone ne dit pas quelle version a été essayée. Vérifie aussi la saisie des montants : un champ qui réécrit sa valeur à chaque frappe se réécrit sous le doigt, le curseur repart à la fin et un chiffre tapé après la virgule ne change rien — invisible au clavier d'un ordinateur, systématique sur un téléphone. Vérifie enfin l'ouverture **directe** sur un onglet, sans passer par la racine : c'est tout ce que sait faire un raccourci d'écran d'accueil, et la route « * » ramènerait sinon vers l'assistant de création sans le moindre message. Et la réception d'un lien profond : au démarrage, quand l'application est déjà ouverte — et **jamais** dans un navigateur, où aucun lien n'arrive. Vérifie encore l'adresse d'accès direct à l'onglet Instantané : celle du site dans un navigateur, et le lien profond `vtcbons://instantane` dans l'application installée — masquer ce bloc en natif, au motif que l'adresse du site n'y résoudrait nulle part, laissait le raccourci iOS impossible à renseigner. Vérifie enfin que le réglage d'antédatation s'enregistre réellement, en le relisant **depuis la base** |
 | `fichiers.test.ts` | Le partage et le téléchargement des PDF et des sauvegardes. Ce fichier existe parce que les deux boutons ne faisaient **rien** sur l'APK, sans le moindre message : toute la stratégie reposait sur `navigator.share` et sur l'attribut `download` d'une ancre, deux mécanismes absents d'une WebView Android — `navigator.share` y est explicitement non implémenté, alors qu'il fonctionne dans celle d'iOS, qui suit Safari. Le test qui manquait place donc le code dans les conditions d'une WebView Android, **sans** `navigator.share`, et exige que les greffons natifs prennent le relais. Vérifie aussi la **fidélité des octets** : un base64 mal formé enverrait un PDF corrompu chez le client, et c'est la seule chose que le chauffeur ne peut pas vérifier avant d'envoyer. Vérifie enfin que le découpage en tranches n'est pas décoratif — un document de 300 000 octets passe, là où `String.fromCharCode(...octets)` déborde la pile d'appels, c'est-à-dire précisément sur les PDF qui comptent |
 | `documents-ecran.test.tsx` | L'écran « Documents du chauffeur », où le chauffeur ne lisait que l'**initiale** de chaque libellé sur Android : « P » pour « Permis de conduire catégorie B en cours de validité ». Mesuré dans un moteur réel, le libellé ne disposait plus que de 23 px sur 360, soit quatre caractères sur cinquante et un. Ce test garde la **cause** — le libellé doit pouvoir revenir à la ligne, et la rangée qui le porte doit pouvoir renvoyer le badge dessous — et non l'effet : jsdom ne calcule aucune mise en page, où une mesure de largeur serait verte quoi qu'il arrive. Vérifie aussi que les actions, déplacées sur une seconde rangée, restent nommées pour un lecteur d'écran : sans quoi le remède aurait échangé un défaut de lisibilité contre une perte de fonction |
+| `quota.test.ts`, `licence.test.ts`, `offres.test.ts`, `premium-ecran.test.tsx`, `bandeau-licence.test.tsx` | La version d'essai, la licence qui la lève, et ce qui est vendu. Ce qui est compté — et surtout ce qui ne l'est pas — y est fixé une règle à la fois : un brouillon n'a pas de numéro, un bon **facturé** quitte le statut « émis » (compter par statut permettrait d'émettre sans fin), un avoir corrige une facture (le compter punirait la correction d'une erreur), un client supprimé ne coûte rien. Le total n'est jamais lu dans les compteurs, dont la remise à zéro annuelle est active par défaut. Côté licence, ce qui est éprouvé est l'**ordre** des contrôles — la signature avant la lecture de la charge, l'expiration après — et les refus : une licence absente, illisible, expirée ou signée par une autre clé ne doit **rien** ouvrir, et un jeton refusé ne doit **rien** laisser dans les réglages, sinon le prochain lancement le relirait et le chauffeur croirait avoir débloqué. Une paire de clés est engendrée sur place, jamais celle du dépôt : la clé privée est absente de tout clone. La **grâce** de trois jours après échéance y est mesurée jour par jour, bornes comprises — et un test vérifie que l'écran et le service **s'accordent**, parce que deux lectures d'une même règle finissent toujours par diverger : le pire des cas serait un panneau de refus affiché devant une création qui fonctionne. Les écrans, eux, sont éprouvés sur ce que la route garde et sur ce qu'elle ne garde pas : atteindre un plafond ne doit jamais rendre inaccessible un document déjà émis |
 | `format.test.ts`, `validation.test.ts`, `ui.test.tsx` | Dates en heure locale, identifiants administratifs, composants d'interface — dont la saisie d'un montant : champ vide quand le montant est nul, texte conservé tel qu'il est tapé, contenu sélectionné au focus, et saisie illisible gardée à l'écran plutôt que remplacée |
 | `navigation-jsdom.test.tsx` | Le comportement de l'environnement de test sur lequel repose la navigation des autres tests — il n'éprouve pas l'application. Il fixe le fait qu'une écriture dans l'adresse est appliquée **tout de suite** mais n'avertit le routeur que **plus tard**, si bien qu'un remplacement d'adresse survenu entre-temps est celui que le routeur suivra. C'est ce qui faisait naviguer un test vers une route et le laissait sur une autre, sans message |
 
@@ -280,6 +371,9 @@ src/
     mentions.ts            Référentiel unique des mentions réglementaires
     backup.ts              Sauvegarde et restauration
     geo.ts                 Recherche d'adresses et distance routière — le seul appel réseau
+    quota.ts               Plafonds de la version d'essai, et ce qui est compté
+    licence.ts             Vérification d'une licence signée, et la clé publique embarquée
+    acces.ts               Point de passage unique de la décision d'accès, et la grâce
     pdf/
       documentData.ts      Contenu imprimé, construit de façon pure et testable
       moteurPdf.tsx        Le moteur de rendu, chargé à la demande
@@ -288,11 +382,13 @@ src/
     bons/                  Bons de commande, bon instantané, contrôle de conformité, mode contrôle
     factures/              Factures, avoirs, indicateurs
     clients/               Clients enregistrés, et leur profil de bon instantané
+    premium/               Écrans d'essai et de licence, formules vendues, bandeau d'état
     reglages/              Réglages et sauvegarde
   components/              Interface — dont le champ d'adresse assisté
-  tests/                     Tests automatisés
-  scripts/                   Génération des icônes
-  .github/workflows/         Compilation et publication automatiques
+tests/                     Tests automatisés
+scripts/                   Icônes, clés et licences, vérificateurs du dépôt
+native/                    Déclarations de raccourci Android et iOS, posées par script
+.github/workflows/         Compilation et publication automatiques
 ```
 
 Trois principes structurent le code :
