@@ -20,10 +20,17 @@ import { getSettings } from './db';
 import { joursRestants } from './format';
 import { verifierLicence, type EtatLicence } from './licence';
 import { etatQuotaGlobal, verifierPlafond, type EtatQuota, type TypeQuota } from './quota';
+import { VENTE_ACTIVE } from './vente';
 
 export interface EtatAcces {
   licence: EtatLicence;
   quotas: Record<TypeQuota, EtatQuota>;
+  /**
+   * Vrai quand la version payante est en service. Faux, l'application est libre : les
+   * écrans qui n'existent que pour vendre s'effacent sur ce champ, sans avoir à connaître
+   * l'interrupteur eux-mêmes.
+   */
+  venteActive: boolean;
   /** Vrai quand PLUS AUCUNE création n'est possible. */
   verrouille: boolean;
   /** Vrai quand au moins un plafond est atteint : quelque chose est bloqué. */
@@ -35,10 +42,15 @@ export interface EtatAcces {
  * `verifierLicence`. Ce n'est pas un crochet de test : c'est ce qui permettra de
  * remplacer la clé de développement par celle de production sans toucher à la logique,
  * et c'est ce qui rend le mécanisme éprouvable sans détenir la clé privée.
+ *
+ * `venteActive` suit la même règle, et pour la même raison : l'interrupteur de vente
+ * s'injecte, sinon plus aucun test ne pourrait éprouver le plafond sans que la vente
+ * soit rallumée pour tout le monde.
  */
 export interface OptionsAcces {
   reference?: Date;
   clePublique?: string;
+  venteActive?: boolean;
 }
 
 /** Lit la licence enregistrée dans les réglages et dit ce qu'elle vaut. */
@@ -53,12 +65,14 @@ export async function aUneLicence(options: OptionsAcces = {}): Promise<boolean> 
 }
 
 export async function etatAcces(options: OptionsAcces = {}): Promise<EtatAcces> {
+  const venteActive = options.venteActive ?? VENTE_ACTIVE;
   const licence = await etatLicence(options);
-  const quotas = await etatQuotaGlobal();
+  const quotas = await etatQuotaGlobal({ venteActive });
   const atteints = Object.values(quotas).filter((quota) => quota.atteint).length;
   return {
     licence,
     quotas,
+    venteActive,
     verrouille: atteints === Object.keys(quotas).length,
     partiellementBloque: atteints > 0,
   };
@@ -119,10 +133,15 @@ export function joursDeGraceRestants(
  * refus ne doit laisser aucun brouillon orphelin et ne doit consommer aucun numéro.
  *
  * Une licence valide lève tous les plafonds d'un coup — c'est tout l'objet de l'achat.
+ *
+ * Rien à faire de plus pour éteindre la vente : quand elle est éteinte, `verifierPlafond`
+ * ne lève jamais, parce que le seul champ qui décide (`atteint`) est faux. Cette fonction
+ * garde donc sa forme, et c'est voulu — une fonction qui se met à ne rien faire est plus
+ * facile à relire qu'une fonction qu'on a démontée.
  */
 export async function verifierAcces(type: TypeQuota, options: OptionsAcces = {}): Promise<void> {
   const licence = await etatLicence(options);
   if (licence.valide) return;
   if (enGrace(licence, options.reference)) return;
-  await verifierPlafond(type);
+  await verifierPlafond(type, { venteActive: options.venteActive });
 }

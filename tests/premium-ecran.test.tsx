@@ -72,6 +72,16 @@ vi.mock('../src/features/premium/offres', async (importOriginal) => {
   };
 });
 
+/**
+ * La vente est ALLUMÉE pour tout ce fichier.
+ *
+ * L'application, elle, l'éteint : `VENTE_ACTIVE` vaut `false` dans `src/lib/vente.ts`.
+ * Sans ce remplacement, le bandeau et le panneau de plafond n'existeraient plus à
+ * l'écran, et ces tests ne prouveraient plus rien du découpage qu'ils surveillent.
+ * `tests/vente-eteinte.test.tsx` éprouve l'état livré, sans aucun remplacement.
+ */
+vi.mock('../src/lib/vente', () => ({ VENTE_ACTIVE: true }));
+
 import { App } from '../src/App';
 import { db, effacerToutesLesDonnees, getSettings } from '../src/lib/db';
 import { PLAFONDS } from '../src/lib/quota';
@@ -208,6 +218,19 @@ describe('plafond atteint', () => {
 
     await allerA('/clients');
     await screen.findByRole('heading', { name: 'Clients' }, { timeout: DELAI });
+
+    /**
+     * Attendre que l'état d'accès soit LU, et pas seulement que la liste soit affichée.
+     *
+     * `estBloque(null, 'clients')` vaut FAUX : tant que le contexte n'a pas rendu son
+     * verdict, « Ajouter » ouvre le formulaire au lieu du panneau. Le clic partait donc
+     * parfois avant la lecture, et ce test échouait environ une fois sur trois sans que
+     * rien ne soit cassé — mesuré sur trois passages consécutifs du même code.
+     *
+     * Le bandeau est le seul élément de l'écran qui dépende de cet état : sa présence est
+     * la preuve que la lecture est faite, et non un délai qu'on espère suffisant.
+     */
+    await screen.findByTestId('bandeau-essai', {}, { timeout: DELAI });
 
     // La liste reste consultable : aucun panneau tant que rien n'est demandé.
     expect(screen.queryByTestId('ecran-plafond')).toBeNull();

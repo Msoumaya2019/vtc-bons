@@ -36,7 +36,13 @@ vi.mock('../src/context/AccesContext', () => ({
 
 import { BandeauEssai } from '../src/features/premium/BandeauEssai';
 
-/** Un état d'accès complet, à partir de la seule licence — le reste n'est que remplissage. */
+/**
+ * Un état d'accès complet, à partir de la seule licence — le reste n'est que remplissage.
+ *
+ * `venteActive` est VRAI ici, alors que l'application livrée l'éteint : ce fichier éprouve
+ * le RENDU du bandeau, qui n'a de sens que si la vente est en service. L'état éteint est
+ * éprouvé dans `tests/vente-eteinte.test.tsx`.
+ */
 function etatAvec(licence: EtatLicence, utilise = 0): EtatAcces {
   const quota = (type: TypeQuota) => ({
     type,
@@ -48,6 +54,7 @@ function etatAvec(licence: EtatLicence, utilise = 0): EtatAcces {
   return {
     licence,
     quotas: { bons: quota('bons'), factures: quota('factures'), clients: quota('clients') },
+    venteActive: true,
     verrouille: false,
     partiellementBloque: false,
   };

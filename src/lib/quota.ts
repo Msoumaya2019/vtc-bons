@@ -28,9 +28,16 @@
  * consommé et la séquence a avancé, définitivement. Un client supprimé, lui, ne compte
  * plus : ce n'est pas un document numéroté, et perdre un rang pour une fiche saisie par
  * erreur serait une punition sans rapport avec ce qui est vendu.
+ *
+ * Enfin, ce plafond peut être ÉTEINT : `VENTE_ACTIVE` dans `./vente.ts` décide si
+ * l'application est vendue ou libre. Éteint, le plafond reste ANNONCÉ — ce qui a été
+ * consommé reste vrai — mais il n'est jamais ATTEINT, et `atteint` est le seul champ sur
+ * lequel se règlent `verifierPlafond`, `estBloque` et la garde des routes. Une seule
+ * valeur décide donc, et il n'existe pas deux lectures de la même règle à faire diverger.
  */
 
 import { db } from './db';
+import { VENTE_ACTIVE } from './vente';
 
 export type TypeQuota = 'bons' | 'factures' | 'clients';
 
@@ -48,6 +55,15 @@ export interface EtatQuota {
   atteint: boolean;
 }
 
+/**
+ * L'interrupteur est injectable, comme la clé publique et la date de référence le sont
+ * dans `acces.ts`. Ce n'est pas un crochet de test : c'est ce qui permet d'éprouver le
+ * plafond sans rallumer la vente pour tout le monde.
+ */
+export interface OptionsQuota {
+  venteActive?: boolean;
+}
+
 /** Compte ce qui a été consommé. Voir l'en-tête pour le détail des trois règles. */
 export async function compterConsomme(type: TypeQuota): Promise<number> {
   switch (type) {
@@ -60,7 +76,7 @@ export async function compterConsomme(type: TypeQuota): Promise<number> {
   }
 }
 
-export async function etatQuota(type: TypeQuota): Promise<EtatQuota> {
+export async function etatQuota(type: TypeQuota, options: OptionsQuota = {}): Promise<EtatQuota> {
   const plafond = PLAFONDS[type];
   const utilise = await compterConsomme(type);
   return {
@@ -68,15 +84,19 @@ export async function etatQuota(type: TypeQuota): Promise<EtatQuota> {
     utilise,
     plafond,
     restant: Math.max(0, plafond - utilise),
-    atteint: utilise >= plafond,
+    // Le seul champ qui décide. `restant` continue de dire la vérité sur ce qui a été
+    // consommé, même éteint : c'est l'ATTEINTE qui est éteinte, pas le compte.
+    atteint: (options.venteActive ?? VENTE_ACTIVE) && utilise >= plafond,
   };
 }
 
-export async function etatQuotaGlobal(): Promise<Record<TypeQuota, EtatQuota>> {
+export async function etatQuotaGlobal(
+  options: OptionsQuota = {},
+): Promise<Record<TypeQuota, EtatQuota>> {
   const [bons, factures, clients] = await Promise.all([
-    etatQuota('bons'),
-    etatQuota('factures'),
-    etatQuota('clients'),
+    etatQuota('bons', options),
+    etatQuota('factures', options),
+    etatQuota('clients', options),
   ]);
   return { bons, factures, clients };
 }
@@ -107,8 +127,8 @@ export function libelleQuota(type: TypeQuota): string {
 }
 
 /** Lève si le plafond est atteint. À appeler AVANT toute écriture. */
-export async function verifierPlafond(type: TypeQuota): Promise<void> {
-  const etat = await etatQuota(type);
+export async function verifierPlafond(type: TypeQuota, options: OptionsQuota = {}): Promise<void> {
+  const etat = await etatQuota(type, options);
   if (etat.atteint) {
     throw new ErreurQuota(
       type,

@@ -26,10 +26,16 @@ const LIBELLE_COURT: Record<TypeQuota, string> = {
  * jours pour le renouveler avant que la création ne s'arrête.
  *
  * Disparaît dès qu'une licence est valide : plus rien à compter, plus rien à annoncer.
+ *
+ * Disparaît aussi quand la vente est ÉTEINTE (`VENTE_ACTIVE`, dans `src/lib/vente.ts`).
+ * Le bandeau n'existe que pour rendre un plafond visible ; sans plafond, il annoncerait
+ * « Bons 3/10 » à un chauffeur que rien ne limite — des chiffres faux, et inquiétants,
+ * exactement ce qu'il est là pour éviter.
  */
 export function BandeauEssai() {
   const { etat } = useAcces();
-  if (!etat || etat.licence.valide) return null;
+  if (!etat) return null;
+  if (!etat.venteActive || etat.licence.valide) return null;
 
   const joursGrace = joursDeGraceRestants(etat.licence);
   const enGrace = joursGrace !== null;

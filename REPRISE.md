@@ -32,6 +32,7 @@ en-têtes de fichier portent les décisions et les pièges déjà rencontrés. E
 | Fichier | Ce qu'il faut y lire avant d'y toucher |
 | --- | --- |
 | `src/lib/quota.ts` | Les trois règles de comptage de la version d'essai, et pourquoi un plafond n'est pas une serrure |
+| `src/lib/vente.ts` | L'interrupteur de la vente — **éteint** aujourd'hui, et pourquoi c'est une constante de compilation et non un réglage |
 | `src/lib/licence.ts` | L'ordre des contrôles : la signature **avant** la lecture de la charge, l'expiration **après** |
 | `src/lib/acces.ts` | Le point de passage **unique** de la décision d'accès, et la grâce après échéance |
 | `src/lib/tva.ts` | Le moteur fiscal : TVA par taux sur la base HT, jamais ligne à ligne |
@@ -99,11 +100,21 @@ doigt — invisible au clavier d'un ordinateur, systématique sur un téléphone
 
 C'est la partie la plus récente, et la plus subtile.
 
-- Le plafond d'essai est **10 bons / 10 factures / 10 clients**. Un code de licence signé
-  (**ECDSA P-256**, vérifié par Web Crypto) le lève. La **clé publique** est dans
+- **La vente est ÉTEINTE.** `VENTE_ACTIVE` vaut `false` dans `src/lib/vente.ts` : aucun plafond,
+  aucun bandeau, aucune formule, et rien qui mène à la page de licence. Le mécanisme est entier
+  derrière l'interrupteur, et les fichiers qui éprouvent le plafond le rallument explicitement
+  (`vi.mock` de `src/lib/vente` dans `tests/quota.test.ts` et `tests/premium-ecran.test.tsx`) ;
+  `tests/vente-eteinte.test.tsx` éprouve à l'inverse l'état livré, sans aucun remplacement.
+  **Rallumer la vente ne fait tomber que ce dernier fichier** — mesuré par mutation. C'est une
+  constante de **compilation**, jamais un réglage : un interrupteur rangé dans les réglages serait
+  un contournement du plafond livré avec l'application, et modifiable sans même l'ouvrir, la
+  sauvegarde étant du JSON lisible.
+- Quand elle est allumée, le plafond d'essai est **10 bons / 10 factures / 10 clients**. Un code de
+  licence signé (**ECDSA P-256**, vérifié par Web Crypto) le lève. La **clé publique** est dans
   `src/lib/licence.ts` ; la **clé privée** est dans `scripts/cle-licence-privee.jwk.json`, écartée
   du dépôt. **Elle n'est donc dans aucune sauvegarde GitHub, et c'est voulu : c'est le seul secret
-  du projet.** Perdue, plus aucune licence ne peut être signée.
+  du projet.** Perdue, plus aucune licence ne peut être signée. Une copie de secours, avec sa
+  notice, est à la racine de l'espace de travail, dans `cles-licence/`.
 - Deux formules sont vendues : **3,99 € par mois** (jeton de 31 jours) et **29,99 € par an**
   (366 jours), dans `src/features/premium/offres.ts`. **Les deux liens de paiement Stripe sont
   encore vides** : tant qu'ils le sont, la carte d'achat ne s'affiche pas à l'écran — un bouton qui
@@ -116,9 +127,12 @@ C'est la partie la plus récente, et la plus subtile.
 
 ## Ce qui reste à faire
 
-1. **Coller les deux liens de paiement Stripe** dans `src/features/premium/offres.ts` (constantes
-   `LIEN_MENSUEL` et `LIEN_ANNUEL`). Rien d'autre à faire : la carte apparaît d'elle-même, et le
-   test qui fixe son absence tant que les liens sont vides est dans `tests/premium-ecran.test.tsx`.
+1. **Décider de vendre, puis rallumer** : passer `VENTE_ACTIVE` à `true` dans `src/lib/vente.ts`,
+   et revoir `tests/vente-eteinte.test.tsx` — qui décrit l'état éteint et doit donc être supprimé
+   ou adapté. Ensuite seulement, **coller les deux liens de paiement Stripe** dans
+   `src/features/premium/offres.ts` (constantes `LIEN_MENSUEL` et `LIEN_ANNUEL`). Rien d'autre à
+   faire : la carte apparaît d'elle-même, et le test qui fixe son absence tant que les liens sont
+   vides est dans `tests/premium-ecran.test.tsx`.
 2. **Automatiser la signature des renouvellements** — aujourd'hui manuelle, environ une minute par
    client et par mois. Le point délicat n'est pas d'encaisser, c'est de **signer**. Le mécanisme de
    lien profond existe déjà (`src/lib/lienProfond.ts`, `CIBLES`, `src/components/EcouteLienProfond.tsx`)

@@ -13,7 +13,7 @@
  *    pour un document que le chauffeur n'a pas le droit d'émettre.
  */
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, effacerToutesLesDonnees, saveSettings } from '../src/lib/db';
 import {
   ErreurQuota,
@@ -39,6 +39,25 @@ import {
   signerLicence,
 } from './aides';
 import type { StatutBon, TypeFacture } from '../src/types';
+
+/**
+ * La vente est ALLUMÉE pour tout ce fichier.
+ *
+ * L'application, elle, l'éteint : `VENTE_ACTIVE` vaut `false` dans `src/lib/vente.ts`.
+ * C'est une décision de livraison, pas une propriété du mécanisme — et ces tests
+ * éprouvent le MÉCANISME. Les laisser s'éteindre avec lui reviendrait à ne plus rien
+ * prouver, et à ne découvrir que le plafond est cassé qu'au moment de le rallumer, en
+ * vendant.
+ *
+ * L'interrupteur est remplacé au niveau du module, et non passé en option à chaque appel,
+ * pour deux raisons : il n'y a alors rien à oublier d'un appel à l'autre, et un renommage
+ * de la constante fait échouer ce fichier bruyamment au lieu de le laisser passer en
+ * silence avec un mock devenu inerte.
+ *
+ * Le fichier `tests/vente-eteinte.test.tsx` éprouve l'autre face, celle qui est livrée,
+ * sans aucun remplacement.
+ */
+vi.mock('../src/lib/vente', () => ({ VENTE_ACTIVE: true }));
 
 /**
  * Délai du seul test qui ÉMET réellement un bon.
