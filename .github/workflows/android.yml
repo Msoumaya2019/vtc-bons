@@ -139,7 +139,7 @@ jobs:
         # Elle expire aussi : GitHub supprime les entrées non consultées pendant plus de sept
         # jours. Un projet qui compile moins souvent repart donc d'une clé neuve — d'où la
         # consigne, côté chauffeur, d'exporter une sauvegarde avant CHAQUE installation.
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.config/.android/debug.keystore
           key: android-debug-keystore-v1
